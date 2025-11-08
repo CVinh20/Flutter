@@ -19,6 +19,9 @@ class Booking {
   final String? voucherCode; // Mã voucher đã áp dụng
   final double? discount;    // Số tiền giảm giá từ voucher
   final double? originalAmount; // Số tiền gốc trước khi giảm
+  final String? stylistNotes; // Ghi chú của stylist (kiểu tóc, sản phẩm dùng)
+  final DateTime? checkInTime; // Thời gian check-in
+  final String? serviceStatus; // Trạng thái dịch vụ: 'pending', 'in_progress', 'completed'
 
   Booking({
     required this.id,
@@ -36,6 +39,9 @@ class Booking {
     this.voucherCode,
     this.discount,
     this.originalAmount,
+    this.stylistNotes,
+    this.checkInTime,
+    this.serviceStatus,
   });
 
   Booking copyWith({
@@ -50,6 +56,9 @@ class Booking {
     String? voucherCode,
     double? discount,
     double? originalAmount,
+    String? stylistNotes,
+    DateTime? checkInTime,
+    String? serviceStatus,
   }) {
     return Booking(
       id: id ?? this.id,
@@ -67,6 +76,9 @@ class Booking {
       voucherCode: voucherCode ?? this.voucherCode,
       discount: discount ?? this.discount,
       originalAmount: originalAmount ?? this.originalAmount,
+      stylistNotes: stylistNotes ?? this.stylistNotes,
+      checkInTime: checkInTime ?? this.checkInTime,
+      serviceStatus: serviceStatus ?? this.serviceStatus,
     );
   }
 
@@ -87,6 +99,9 @@ class Booking {
       voucherCode: map['voucherCode'],
       discount: map['discount']?.toDouble(),
       originalAmount: map['originalAmount']?.toDouble(),
+      stylistNotes: map['stylistNotes'],
+      checkInTime: map['checkInTime'] != null ? (map['checkInTime'] as Timestamp).toDate() : null,
+      serviceStatus: map['serviceStatus'],
     );
   }
 
@@ -107,6 +122,9 @@ class Booking {
       'voucherCode': voucherCode,
       'discount': discount,
       'originalAmount': originalAmount,
+      'stylistNotes': stylistNotes,
+      'checkInTime': checkInTime != null ? Timestamp.fromDate(checkInTime!) : null,
+      'serviceStatus': serviceStatus,
     };
   }
 }

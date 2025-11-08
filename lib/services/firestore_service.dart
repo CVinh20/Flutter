@@ -79,6 +79,12 @@ class FirestoreService {
             paymentMethod: data['paymentMethod'],
             amount: (data['amount'] ?? 0.0).toDouble(),
             isPaid: data['isPaid'] ?? false,
+            voucherCode: data['voucherCode'],
+            discount: data['discount']?.toDouble(),
+            originalAmount: data['originalAmount']?.toDouble(),
+            stylistNotes: data['stylistNotes'],
+            checkInTime: data['checkInTime'] != null ? (data['checkInTime'] as Timestamp).toDate() : null,
+            serviceStatus: data['serviceStatus'],
           ));
         }
       } catch (e) {
@@ -125,6 +131,12 @@ class FirestoreService {
       'paymentMethod': booking.paymentMethod,
       'amount': booking.amount,
       'isPaid': booking.isPaid,
+      'voucherCode': booking.voucherCode,
+      'discount': booking.discount,
+      'originalAmount': booking.originalAmount,
+      'stylistNotes': booking.stylistNotes,
+      'checkInTime': booking.checkInTime != null ? Timestamp.fromDate(booking.checkInTime!) : null,
+      'serviceStatus': booking.serviceStatus ?? 'pending',
       'createdAt': FieldValue.serverTimestamp(),
     });
     
@@ -140,11 +152,25 @@ class FirestoreService {
   }
 
   Future<void> updateBooking(Booking booking) {
-    return _db.collection('bookings').doc(booking.id).update({
+    final updates = <String, dynamic>{
       'status': booking.status,
       'paymentMethod': booking.paymentMethod,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+    
+    if (booking.stylistNotes != null) {
+      updates['stylistNotes'] = booking.stylistNotes;
+    }
+    
+    if (booking.checkInTime != null) {
+      updates['checkInTime'] = Timestamp.fromDate(booking.checkInTime!);
+    }
+    
+    if (booking.serviceStatus != null) {
+      updates['serviceStatus'] = booking.serviceStatus;
+    }
+    
+    return _db.collection('bookings').doc(booking.id).update(updates);
   }
   
   Future<void> toggleFavoriteService(String serviceId) async {
@@ -300,5 +326,171 @@ class FirestoreService {
       print('Error getting voucher by code: $e');
       return null;
     }
+  }
+
+  // --- STYLIST METHODS ---
+
+  // Lấy bookings của stylist theo stylistId
+  Stream<List<Booking>> getStylistBookings(String stylistId) {
+    return _db
+        .collection('bookings')
+        .where('stylistId', isEqualTo: stylistId)
+        .orderBy('dateTime', descending: false)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final List<Booking> bookings = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        try {
+          final serviceDoc =
+              await _db.collection('services').doc(data['serviceId']).get();
+          final stylistDoc =
+              await _db.collection('stylists').doc(data['stylistId']).get();
+
+          if (serviceDoc.exists && stylistDoc.exists) {
+            bookings.add(Booking(
+              id: doc.id,
+              service: Service.fromFirestore(serviceDoc),
+              stylist: Stylist.fromFirestore(stylistDoc),
+              dateTime: (data['dateTime'] as Timestamp).toDate(),
+              status: data['status'],
+              note: data['note'] ?? "",
+              customerName: data['customerName'] ?? 'Không rõ',
+              customerPhone: data['customerPhone'] ?? 'Không rõ',
+              branchName: data['branchName'] ?? 'Không rõ',
+              paymentMethod: data['paymentMethod'],
+              amount: (data['amount'] ?? 0.0).toDouble(),
+              isPaid: data['isPaid'] ?? false,
+              voucherCode: data['voucherCode'],
+              discount: data['discount']?.toDouble(),
+              originalAmount: data['originalAmount']?.toDouble(),
+              stylistNotes: data['stylistNotes'],
+              checkInTime: data['checkInTime'] != null ? (data['checkInTime'] as Timestamp).toDate() : null,
+              serviceStatus: data['serviceStatus'],
+            ));
+          }
+        } catch (e) {
+          print('Error fetching booking details: $e');
+        }
+      }
+      return bookings;
+    });
+  }
+
+  // Lấy bookings của stylist trong khoảng thời gian (ngày/tuần)
+  // Sử dụng filter và sort ở client side để tránh cần composite index
+  Stream<List<Booking>> getStylistBookingsByDateRange(
+    String stylistId,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    return _db
+        .collection('bookings')
+        .where('stylistId', isEqualTo: stylistId)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final List<Booking> bookings = [];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        try {
+          final bookingDate = (data['dateTime'] as Timestamp).toDate();
+          
+          // Filter theo date range ở client side
+          if (bookingDate.isBefore(startDate) || bookingDate.isAfter(endDate)) {
+            continue;
+          }
+          
+          final serviceDoc =
+              await _db.collection('services').doc(data['serviceId']).get();
+          final stylistDoc =
+              await _db.collection('stylists').doc(data['stylistId']).get();
+
+          if (serviceDoc.exists && stylistDoc.exists) {
+            bookings.add(Booking(
+              id: doc.id,
+              service: Service.fromFirestore(serviceDoc),
+              stylist: Stylist.fromFirestore(stylistDoc),
+              dateTime: bookingDate,
+              status: data['status'],
+              note: data['note'] ?? "",
+              customerName: data['customerName'] ?? 'Không rõ',
+              customerPhone: data['customerPhone'] ?? 'Không rõ',
+              branchName: data['branchName'] ?? 'Không rõ',
+              paymentMethod: data['paymentMethod'],
+              amount: (data['amount'] ?? 0.0).toDouble(),
+              isPaid: data['isPaid'] ?? false,
+              voucherCode: data['voucherCode'],
+              discount: data['discount']?.toDouble(),
+              originalAmount: data['originalAmount']?.toDouble(),
+              stylistNotes: data['stylistNotes'],
+              checkInTime: data['checkInTime'] != null ? (data['checkInTime'] as Timestamp).toDate() : null,
+              serviceStatus: data['serviceStatus'],
+            ));
+          }
+        } catch (e) {
+          print('Error fetching booking details: $e');
+        }
+      }
+      // Sort theo dateTime ở client side
+      bookings.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      return bookings;
+    });
+  }
+
+  // Check-in khách hàng
+  Future<void> checkInBooking(String bookingId) async {
+    await _db.collection('bookings').doc(bookingId).update({
+      'checkInTime': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Cập nhật trạng thái dịch vụ
+  Future<void> updateServiceStatus(String bookingId, String serviceStatus) async {
+    await _db.collection('bookings').doc(bookingId).update({
+      'serviceStatus': serviceStatus,
+      'updatedAt': FieldValue.serverTimestamp(),
+      // Nếu hoàn tất, cập nhật status
+      if (serviceStatus == 'completed') 'status': 'Đã hoàn tất',
+    });
+  }
+
+  // Cập nhật ghi chú của stylist
+  Future<void> updateStylistNotes(String bookingId, String notes) async {
+    await _db.collection('bookings').doc(bookingId).update({
+      'stylistNotes': notes,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Cập nhật booking bởi stylist (tổng hợp các thao tác trên)
+  Future<void> updateBookingByStylist({
+    required String bookingId,
+    String? serviceStatus,
+    String? stylistNotes,
+    bool? checkIn,
+  }) async {
+    final Map<String, dynamic> updates = {
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (checkIn == true) {
+      updates['checkInTime'] = FieldValue.serverTimestamp();
+    }
+
+    if (serviceStatus != null) {
+      updates['serviceStatus'] = serviceStatus;
+      if (serviceStatus == 'completed') {
+        updates['status'] = 'Đã hoàn tất';
+      } else if (serviceStatus == 'in_progress') {
+        updates['status'] = 'Đang thực hiện';
+      }
+    }
+
+    if (stylistNotes != null) {
+      updates['stylistNotes'] = stylistNotes;
+    }
+
+    await _db.collection('bookings').doc(bookingId).update(updates);
   }
 }

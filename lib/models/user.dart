@@ -7,6 +7,7 @@ class UserModel {
   final String displayName;
   final String? photoURL;
   final bool isAdmin;
+  final String? stylistId; // ID của stylist nếu user là stylist
   final DateTime createdAt;
   final DateTime? lastLoginAt;
 
@@ -16,6 +17,7 @@ class UserModel {
     required this.displayName,
     this.photoURL,
     this.isAdmin = false,
+    this.stylistId,
     required this.createdAt,
     this.lastLoginAt,
   });
@@ -28,6 +30,7 @@ class UserModel {
       displayName: data['displayName'] ?? '',
       photoURL: data['photoURL'],
       isAdmin: data['isAdmin'] ?? false,
+      stylistId: data['stylistId'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate(),
     );
@@ -39,6 +42,7 @@ class UserModel {
       'displayName': displayName,
       'photoURL': photoURL,
       'isAdmin': isAdmin,
+      'stylistId': stylistId,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
     };
@@ -50,6 +54,7 @@ class UserModel {
     String? displayName,
     String? photoURL,
     bool? isAdmin,
+    String? stylistId,
     DateTime? createdAt,
     DateTime? lastLoginAt,
   }) {
@@ -59,8 +64,12 @@ class UserModel {
       displayName: displayName ?? this.displayName,
       photoURL: photoURL ?? this.photoURL,
       isAdmin: isAdmin ?? this.isAdmin,
+      stylistId: stylistId ?? this.stylistId,
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
     );
   }
+
+  // Kiểm tra xem user có phải là stylist không
+  bool get isStylist => stylistId != null && stylistId!.isNotEmpty;
 }

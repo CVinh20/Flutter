@@ -105,12 +105,21 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
               
               final bookings = snapshot.data!;
               // Lọc booking sắp tới: chưa hoàn thành và chưa hủy
+              // Kiểm tra cả serviceStatus == 'completed' và status == 'Hoàn thành' hoặc 'Đã hoàn tất'
               List<Booking> upcomingBookings = bookings
-                  .where((b) => b.status != 'Hoàn thành' && b.status != 'Đã hủy')
+                  .where((b) => 
+                      b.status != 'Hoàn thành' && 
+                      b.status != 'Đã hoàn tất' && 
+                      b.status != 'Đã hủy' &&
+                      b.serviceStatus != 'completed')
                   .toList();
               // Lọc lịch sử: đã hoàn thành hoặc đã hủy
               List<Booking> pastBookings = bookings
-                  .where((b) => b.status == 'Hoàn thành' || b.status == 'Đã hủy')
+                  .where((b) => 
+                      b.status == 'Hoàn thành' || 
+                      b.status == 'Đã hoàn tất' || 
+                      b.status == 'Đã hủy' ||
+                      b.serviceStatus == 'completed')
                   .toList();
 
               return TabBarView(

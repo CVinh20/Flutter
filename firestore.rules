@@ -14,6 +14,30 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
     
+    // Kiểm tra xem user có phải là stylist không
+    function isStylist() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.stylistId != null;
+    }
+    
+    // Kiểm tra xem user có phải là stylist của booking này không
+    function isBookingStylist(bookingData) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.stylistId != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.stylistId == bookingData.stylistId;
+    }
+    
+    // Kiểm tra xem stylist hiện tại có phải là stylist của booking không (dùng cho update)
+    function isStylistOfBooking() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.stylistId != null &&
+        resource.data.stylistId != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.stylistId == resource.data.stylistId;
+    }
+    
     // Kiểm tra xem user có phải là chủ của payment không
     function isPaymentOwner(paymentData) {
       return isAuthenticated() && paymentData.userId == request.auth.uid;
@@ -32,7 +56,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || 
+        isAdmin() || 
+        isStylistOfBooking()
       );
       allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isAdmin()

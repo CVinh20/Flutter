@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -14,6 +15,7 @@ import 'screens/quick_booking_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/admin/admin_dashboard.dart';
+import 'screens/stylist/stylist_dashboard_screen.dart';
 import 'services/notification_service.dart';
 import 'services/admin_service.dart';
 import 'package:convex_bottom_bar/convex_bottom_bar.dart';
@@ -22,6 +24,16 @@ import 'utils/firebase_config_checker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Khởi tạo locale data cho tiếng Việt
+  // Cần thiết khi sử dụng DateFormat với locale 'vi'
+  try {
+    await initializeDateFormatting('vi', null);
+  } catch (e) {
+    print('Warning: Could not initialize date formatting for locale vi: $e');
+    // Continue execution even if locale initialization fails
+  }
+  
   await NotificationService().init();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -156,28 +168,31 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final AdminService _adminService = AdminService();
   bool _isLoading = true;
   bool _isAdmin = false;
+  bool _isStylist = false;
 
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
+    _checkUserRole();
   }
 
-  Future<void> _checkAdminStatus() async {
+  Future<void> _checkUserRole() async {
     try {
       final user = await _adminService.getCurrentUser();
       if (mounted) {
         setState(() {
           _isAdmin = user?.isAdmin ?? false;
+          _isStylist = user?.isStylist ?? false;
           _isLoading = false;
         });
-        print('Admin status checked: isAdmin = $_isAdmin');
+        print('User role checked: isAdmin = $_isAdmin, isStylist = $_isStylist');
       }
     } catch (e) {
-      print('Error checking admin status: $e');
+      print('Error checking user role: $e');
       if (mounted) {
         setState(() {
           _isAdmin = false;
+          _isStylist = false;
           _isLoading = false;
         });
       }
@@ -196,10 +211,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    print('Building AuthWrapper: isAdmin = $_isAdmin');
+    print('Building AuthWrapper: isAdmin = $_isAdmin, isStylist = $_isStylist');
     
     if (_isAdmin) {
       return const AdminDashboard();
+    } else if (_isStylist) {
+      return const StylistDashboardScreen();
     } else {
       return const MainScreen();
     }

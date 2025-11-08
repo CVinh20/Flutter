@@ -186,4 +186,133 @@ class AdminService {
       print('Error updating admin status: $e');
     }
   }
+
+  // Tạo tài khoản cho stylist (chỉ admin mới có thể gọi)
+  Future<String> createStylistAccount({
+    required String email,
+    required String password,
+    required String stylistId,
+    required String stylistName,
+  }) async {
+    try {
+      // Kiểm tra quyền admin
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('Bạn cần đăng nhập để thực hiện thao tác này');
+      }
+      
+      final isAdminUser = await isAdmin(currentUser.uid);
+      if (!isAdminUser) {
+        throw Exception('Chỉ admin mới có thể tạo tài khoản cho stylist');
+      }
+
+      // Kiểm tra email đã tồn tại chưa
+      final existingUsers = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+      
+      if (existingUsers.docs.isNotEmpty) {
+        // Kiểm tra xem user này đã được liên kết với stylist khác chưa
+        final existingUserData = existingUsers.docs.first.data();
+        if (existingUserData['stylistId'] != null && existingUserData['stylistId'] != stylistId) {
+          throw Exception('Email này đã được liên kết với stylist khác');
+        }
+        
+        // Nếu đã có user với email này, liên kết với stylistId
+        final userId = existingUsers.docs.first.id;
+        await _firestore.collection('users').doc(userId).update({
+          'stylistId': stylistId,
+          'displayName': stylistName,
+        });
+        return userId;
+      }
+
+      // Tạo tài khoản mới
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Cập nhật display name
+      await userCredential.user?.updateDisplayName(stylistName);
+
+      // Lưu thông tin user vào Firestore với stylistId
+      final stylistUser = UserModel(
+        id: userCredential.user!.uid,
+        email: email,
+        displayName: stylistName,
+        isAdmin: false,
+        stylistId: stylistId,
+        createdAt: DateTime.now(),
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set(stylistUser.toFirestore());
+
+      return userCredential.user!.uid;
+    } catch (e) {
+      print('Error creating stylist account: $e');
+      rethrow;
+    }
+  }
+
+  // Kiểm tra xem stylist đã có tài khoản chưa
+  Future<String?> getStylistAccountId(String stylistId) async {
+    try {
+      final users = await _firestore
+          .collection('users')
+          .where('stylistId', isEqualTo: stylistId)
+          .limit(1)
+          .get();
+      
+      if (users.docs.isNotEmpty) {
+        return users.docs.first.id;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting stylist account: $e');
+      return null;
+    }
+  }
+
+  // Xóa liên kết stylist với user (không xóa user, chỉ xóa stylistId)
+  Future<void> unlinkStylistAccount(String stylistId) async {
+    try {
+      final users = await _firestore
+          .collection('users')
+          .where('stylistId', isEqualTo: stylistId)
+          .get();
+      
+      for (var doc in users.docs) {
+        await doc.reference.update({
+          'stylistId': FieldValue.delete(),
+        });
+      }
+    } catch (e) {
+      print('Error unlinking stylist account: $e');
+      rethrow;
+    }
+  }
+
+  // Lấy thông tin user của stylist
+  Future<UserModel?> getStylistUser(String stylistId) async {
+    try {
+      final users = await _firestore
+          .collection('users')
+          .where('stylistId', isEqualTo: stylistId)
+          .limit(1)
+          .get();
+      
+      if (users.docs.isNotEmpty) {
+        return UserModel.fromFirestore(users.docs.first);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting stylist user: $e');
+      return null;
+    }
+  }
 }
