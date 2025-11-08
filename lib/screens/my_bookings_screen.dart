@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/booking.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
+import 'booking_detail_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -103,11 +104,13 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
               }
               
               final bookings = snapshot.data!;
+              // Lọc booking sắp tới: chưa hoàn thành và chưa hủy
               List<Booking> upcomingBookings = bookings
-                  .where((b) => b.dateTime.isAfter(DateTime.now()))
+                  .where((b) => b.status != 'Hoàn thành' && b.status != 'Đã hủy')
                   .toList();
+              // Lọc lịch sử: đã hoàn thành hoặc đã hủy
               List<Booking> pastBookings = bookings
-                  .where((b) => b.dateTime.isBefore(DateTime.now()))
+                  .where((b) => b.status == 'Hoàn thành' || b.status == 'Đã hủy')
                   .toList();
 
               return TabBarView(
@@ -181,20 +184,33 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
   }
 
   Widget _buildBookingCard(Booking booking, {required bool isUpcoming}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookingDetailScreen(
+              booking: booking,
+              isUpcoming: isUpcoming,
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
+        );
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
           Padding(
             padding: EdgeInsets.all(20),
             child: Row(
@@ -291,7 +307,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
                     ),
                     Text(
                       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ')
-                          .format(booking.service.price),
+                          .format(booking.amount),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -307,7 +323,10 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => _showCancelDialog(booking),
+                          onPressed: () {
+                            // Stop event propagation
+                            _showCancelDialog(booking);
+                          },
                           icon: const Icon(Icons.cancel_outlined, size: 18),
                           label: const Text('Hủy lịch'),
                           style: OutlinedButton.styleFrom(
@@ -323,9 +342,73 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            // Stop event propagation and show coming soon message
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tính năng đổi lịch đang được phát triển'),
+                                backgroundColor: Colors.orange,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                ),
+                              ),
+                            );
+                          },
                           icon: const Icon(Icons.edit_calendar_rounded, size: 18),
                           label: const Text('Đổi lịch'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0891B2),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 3,
+                            shadowColor: const Color(0xFF0891B2).withOpacity(0.2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _showDeleteDialog(booking);
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: const Text('Xóa'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red.shade400,
+                            side: BorderSide(color: Colors.red.shade400),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tính năng đặt lại đang được phát triển'),
+                                backgroundColor: Colors.orange,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Đặt lại'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0891B2),
                             foregroundColor: Colors.white,
@@ -345,6 +428,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -455,6 +539,127 @@ class MyBookingsScreenState extends State<MyBookingsScreen> with SingleTickerPro
                       ),
                       child: Text(
                         'Hủy lịch',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteDialog(Booking booking) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          padding: EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 48),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Xóa lịch hẹn?',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Bạn có chắc chắn muốn xóa lịch hẹn này khỏi lịch sử không?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Không',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await _firestoreService.deleteBooking(booking.id);
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Đã xóa lịch hẹn'),
+                                backgroundColor: Colors.green,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Lỗi: $e'),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: Colors.red.shade400,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Xóa',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

@@ -125,13 +125,19 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
         children: [
           // Form
           AdminSection(
+            title: _editingStylist != null ? 'Chỉnh sửa Stylist' : 'Thêm Stylist mới',
             child: Form(
               key: _formKey,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    decoration: adminInputDecoration('Tên stylist'),
+                    decoration: adminInputDecoration(
+                      'Tên stylist',
+                      hintText: 'Nhập tên stylist',
+                      prefixIcon: const Icon(Icons.person, color: AdminColors.textSecondary),
+                    ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
                         return 'Vui lòng nhập tên stylist';
@@ -146,7 +152,11 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                         child: TextFormField(
                           controller: _ratingController,
                           keyboardType: TextInputType.number,
-                          decoration: adminInputDecoration('Đánh giá'),
+                          decoration: adminInputDecoration(
+                            'Đánh giá (0-5)',
+                            hintText: '4.5',
+                            prefixIcon: const Icon(Icons.star, color: AdminColors.warning),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty ?? true) {
                               return 'Vui lòng nhập đánh giá';
@@ -163,7 +173,11 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _experienceController,
-                          decoration: adminInputDecoration('Kinh nghiệm'),
+                          decoration: adminInputDecoration(
+                            'Kinh nghiệm',
+                            hintText: '3 năm kinh nghiệm',
+                            prefixIcon: const Icon(Icons.work, color: AdminColors.info),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty ?? true) {
                               return 'Vui lòng nhập kinh nghiệm';
@@ -177,7 +191,11 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _imageController,
-                    decoration: adminInputDecoration('URL hình ảnh'),
+                    decoration: adminInputDecoration(
+                      'URL hình ảnh',
+                      hintText: 'https://example.com/image.jpg',
+                      prefixIcon: const Icon(Icons.image, color: AdminColors.accent),
+                    ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
                         return 'Vui lòng nhập URL hình ảnh';
@@ -188,14 +206,23 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      Expanded(child: AdminPrimaryButton(
-                        label: _editingStylist != null ? 'Cập nhật' : 'Thêm mới',
-                        icon: _editingStylist != null ? Icons.save : Icons.add,
-                        onPressed: _isLoading ? null : _addOrUpdateStylist,
-                      )),
+                      Expanded(
+                        child: AdminPrimaryButton(
+                          label: _editingStylist != null ? 'Cập nhật' : 'Thêm mới',
+                          icon: _editingStylist != null ? Icons.save : Icons.add,
+                          isLoading: _isLoading,
+                          onPressed: _isLoading ? null : _addOrUpdateStylist,
+                        ),
+                      ),
                       const SizedBox(width: 16),
                       if (_editingStylist != null)
-                        Expanded(child: AdminDangerButton(label: 'Hủy', onPressed: _clearForm)),
+                        Expanded(
+                          child: AdminDangerButton(
+                            label: 'Hủy',
+                            icon: Icons.close,
+                            onPressed: _clearForm,
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -209,11 +236,20 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
               stream: _firestore.collection('stylists').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const AdminLoadingCard(message: 'Đang tải danh sách stylist...');
                 }
                 
                 if (snapshot.hasError) {
-                  return Center(child: Text('Lỗi: ${snapshot.error}'));
+                  return AdminEmptyState(
+                    title: 'Có lỗi xảy ra',
+                    subtitle: 'Không thể tải danh sách stylist: ${snapshot.error}',
+                    icon: Icons.error_outline,
+                    action: AdminPrimaryButton(
+                      label: 'Thử lại',
+                      icon: Icons.refresh,
+                      onPressed: () => setState(() {}),
+                    ),
+                  );
                 }
                 
                 final stylists = snapshot.data?.docs
@@ -221,55 +257,149 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                     .toList() ?? [];
                 
                 if (stylists.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Chưa có stylist nào',
-                      style: TextStyle(color: AdminColors.textSecondary),
+                  return AdminEmptyState(
+                    title: 'Chưa có stylist nào',
+                    subtitle: 'Hãy thêm stylist đầu tiên để bắt đầu',
+                    icon: Icons.person,
+                    action: AdminPrimaryButton(
+                      label: 'Thêm stylist',
+                      icon: Icons.add,
+                      onPressed: () {
+                        _clearForm();
+                      },
                     ),
                   );
                 }
                 
                 return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 20),
                   itemCount: stylists.length,
                   itemBuilder: (context, index) {
                     final stylist = stylists[index];
                     return AdminCard(
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: stylist.image.isNotEmpty
-                              ? NetworkImage(stylist.image)
-                              : null,
-                          child: stylist.image.isEmpty
-                              ? const Icon(Icons.person)
-                              : null,
-                        ),
-                        title: Text(
-                          stylist.name,
-                          style: const TextStyle(color: AdminColors.textPrimary),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
                           children: [
-                            Text(
-                              'Kinh nghiệm: ${stylist.experience}',
-                              style: const TextStyle(color: AdminColors.textSecondary),
+                            // Stylist Image
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AdminColors.border,
+                                  width: 2,
+                                ),
+                              ),
+                              child: ClipOval(
+                                child: stylist.image.isNotEmpty
+                                    ? Image.network(
+                                        stylist.image,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            color: AdminColors.surfaceAlt,
+                                            child: const Icon(
+                                              Icons.person,
+                                              color: AdminColors.textSecondary,
+                                              size: 30,
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Container(
+                                        color: AdminColors.surfaceAlt,
+                                        child: const Icon(
+                                          Icons.person,
+                                          color: AdminColors.textSecondary,
+                                          size: 30,
+                                        ),
+                                      ),
+                              ),
                             ),
+                            const SizedBox(width: 16),
+                            
+                            // Stylist Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    stylist.name,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AdminColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.work,
+                                        size: 16,
+                                        color: AdminColors.info,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        stylist.experience,
+                                        style: const TextStyle(
+                                          color: AdminColors.textSecondary,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        size: 16,
+                                        color: AdminColors.warning,
+                                      ),
+                                      const SizedBox(width: 6),
                             Text(
-                              'Đánh giá: ${stylist.rating.toStringAsFixed(1)}/5',
-                              style: const TextStyle(color: AdminColors.textSecondary),
+                                        '${stylist.rating.toStringAsFixed(1)}/5',
+                                        style: const TextStyle(
+                                          color: AdminColors.textSecondary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                             ),
                           ],
                         ),
-                        trailing: Row(
+                            ),
+                            
+                            // Actions
+                            Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AdminColors.info.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.edit, color: AdminColors.info),
                               onPressed: () => _editStylist(stylist),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AdminColors.danger.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.delete, color: AdminColors.danger),
                               onPressed: () => _deleteStylist(stylist.id),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

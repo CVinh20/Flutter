@@ -37,7 +37,7 @@ void main() async {
     FirebaseConfigChecker.checkGoogleSignInConfig();
   }
   
-  runApp(const MyApp());
+  runApp(MyApp());
   configLoading();
 }
 
@@ -282,7 +282,7 @@ class MainScreenState extends State<MainScreen> {
         activeColor: const Color(0xFF0891B2),
         height: 60,
         initialActiveIndex: _selectedIndex,
-        items: const [
+        items: [
           TabItem(icon: Icons.home_rounded, title: 'Trang chủ'),
           TabItem(icon: Icons.storefront_rounded, title: 'Chi nhánh'),
           TabItem(icon: Icons.add, title: 'Đặt lịch'),

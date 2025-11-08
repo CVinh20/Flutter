@@ -2,7 +2,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/service.dart';
+import '../models/category.dart';
 import '../services/firestore_service.dart';
+import '../widgets/voucher_section.dart';
 import 'booking_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,7 +21,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
   late Animation<double> _fadeAnimation;
   final TextEditingController _searchController = TextEditingController();
   List<Service> _allServices = [];
-  List<Service> _filteredServices = [];
+  List<Category> _categories = [];
   String _searchQuery = '';
 
   @override
@@ -46,13 +48,9 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
   }
 
   void _filterServices() {
-    if (_searchQuery.isEmpty) {
-      _filteredServices = _allServices;
-    } else {
-      _filteredServices = _allServices.where((service) {
-        return service.name.toLowerCase().contains(_searchQuery);
-      }).toList();
-    }
+    setState(() {
+      // Kích hoạt rebuild với danh sách đã lọc
+    });
   }
 
   void _loadServices() {
@@ -60,6 +58,12 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
       setState(() {
         _allServices = services;
         _filterServices();
+      });
+    });
+    
+    _firestoreService.getCategories().listen((categories) {
+      setState(() {
+        _categories = categories;
       });
     });
   }
@@ -125,9 +129,12 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                       ),
                     ),
                     const SizedBox(height: 28),
-                    _buildSectionTitle('Dịch vụ phổ biến'),
-                    const SizedBox(height: 16),
-                    _buildServicesList(),
+                    
+                    // Voucher Section
+                    const VoucherSection(),
+                    const SizedBox(height: 32),
+                    
+                    _buildServicesByCategory(),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -336,56 +343,94 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     );
   }
 
-  Widget _buildServicesList() {
-    return SizedBox(
-      height: 290,
-      child: _searchQuery.isNotEmpty && _filteredServices.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.search_off,
-                    size: 64,
-                    color: Color(0xFF9CA3AF),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Không tìm thấy dịch vụ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Thử tìm kiếm với từ khóa khác',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : _filteredServices.isEmpty
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD4AF37)),
-                  ),
+  Widget _buildServicesByCategory() {
+    if (_categories.isEmpty) {
+      return const Center(
+        child: Text(
+          'Chưa có danh mục nào',
+          style: TextStyle(
+            fontSize: 16,
+            color: Color(0xFF64748B),
+          ),
+        ),
+      );
+    }
+
+    // Lọc dịch vụ theo tìm kiếm
+    final filteredServices = _searchQuery.isEmpty
+        ? _allServices
+        : _allServices.where((service) {
+            final name = service.name.toLowerCase();
+            final category = _categories
+                .firstWhere(
+                  (cat) => cat.id == service.categoryId,
+                  orElse: () => Category(id: '', name: ''),
                 )
-              : GridView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 1,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.3,
-                  ),
-                  itemCount: _filteredServices.length,
-                  itemBuilder: (context, index) => _buildServiceCard(_filteredServices[index]),
-                ),
+                .name
+                .toLowerCase();
+            
+            return name.contains(_searchQuery) ||
+                category.contains(_searchQuery);
+          }).toList();
+
+    // Nếu có tìm kiếm nhưng không có kết quả
+    if (_searchQuery.isNotEmpty && filteredServices.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Không tìm thấy dịch vụ nào\nphù hợp với "$_searchQuery"',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: _categories.map((category) {
+        final categoryServices = filteredServices
+            .where((service) => service.categoryId == category.id)
+            .toList();
+
+        if (categoryServices.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionTitle(category.name),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 310,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: categoryServices.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: _buildServiceCard(categoryServices[index]),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+        );
+      }).toList(),
     );
   }
 
@@ -401,6 +446,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
+        width: 200,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -416,15 +462,17 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              flex: 3,
+            // Image section
+            Container(
+              height: 180,
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                     child: Image.network(
                       service.image,
                       width: double.infinity,
+                      height: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (c, e, s) => Container(
                         color: const Color(0xFFF8F9FA),
@@ -459,64 +507,122 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                       ),
                     ),
                   ),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: StreamBuilder<List<Service>>(
+                      stream: _firestoreService.getFavoriteServices(),
+                      builder: (context, snapshot) {
+                        final isFavorite = snapshot.hasData && 
+                            snapshot.data!.any((s) => s.id == service.id);
+                        return InkWell(
+                          onTap: () async {
+                            await _firestoreService.toggleFavoriteService(service.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isFavorite ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: isFavorite ? Colors.grey.shade700 : const Color(0xFF0891B2),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              );
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.95),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              isFavorite ? Icons.favorite : Icons.favorite_border,
+                              size: 20,
+                              color: isFavorite ? Colors.red : Colors.grey.shade600,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+            // Content section
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 38, // Giảm xuống để vừa card
+                    child: Text(
                       service.name,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1A1A1A),
+                        height: 1.25,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      softWrap: true,
                     ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
                           '${service.price.toStringAsFixed(0)}₫',
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 17,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0891B2),
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3F4F6),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.access_time, size: 14, color: Color(0xFF6B7280)),
-                              const SizedBox(width: 4),
-                              const Text(
-                                '30 phút',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF6B7280),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.access_time, size: 13, color: Color(0xFF6B7280)),
+                            const SizedBox(width: 3),
+                            Text(
+                              service.duration,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -576,4 +682,5 @@ class _TopButton extends StatelessWidget {
       ],
     );
   }
+
 }

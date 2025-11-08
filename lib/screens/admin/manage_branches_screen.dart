@@ -140,13 +140,19 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
         children: [
           // Form
           AdminSection(
+            title: _editingBranch != null ? 'Chỉnh sửa Chi nhánh' : 'Thêm Chi nhánh mới',
             child: Form(
               key: _formKey,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    decoration: adminInputDecoration('Tên chi nhánh'),
+                    decoration: adminInputDecoration(
+                      'Tên chi nhánh',
+                      hintText: 'Nhập tên chi nhánh',
+                      prefixIcon: const Icon(Icons.store, color: AdminColors.textSecondary),
+                    ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
                         return 'Vui lòng nhập tên chi nhánh';
@@ -157,7 +163,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _addressController,
-                    decoration: adminInputDecoration('Địa chỉ'),
+                    decoration: adminInputDecoration(
+                      'Địa chỉ',
+                      hintText: 'Nhập địa chỉ chi nhánh',
+                      prefixIcon: const Icon(Icons.location_on, color: AdminColors.textSecondary),
+                    ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
                         return 'Vui lòng nhập địa chỉ';
@@ -171,7 +181,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _hoursController,
-                          decoration: adminInputDecoration('Giờ hoạt động'),
+                          decoration: adminInputDecoration(
+                            'Giờ hoạt động',
+                            hintText: '8:00 - 22:00',
+                            prefixIcon: const Icon(Icons.access_time, color: AdminColors.info),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty ?? true) {
                               return 'Vui lòng nhập giờ hoạt động';
@@ -185,7 +199,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                         child: TextFormField(
                           controller: _ratingController,
                           keyboardType: TextInputType.number,
-                          decoration: adminInputDecoration('Đánh giá'),
+                          decoration: adminInputDecoration(
+                            'Đánh giá (0-5)',
+                            hintText: '4.5',
+                            prefixIcon: const Icon(Icons.star, color: AdminColors.warning),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty ?? true) {
                               return 'Vui lòng nhập đánh giá';
@@ -207,7 +225,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                         child: TextFormField(
                           controller: _latitudeController,
                           keyboardType: TextInputType.number,
-                          decoration: adminInputDecoration('Vĩ độ'),
+                          decoration: adminInputDecoration(
+                            'Vĩ độ',
+                            hintText: '10.762622',
+                            prefixIcon: const Icon(Icons.my_location, color: AdminColors.accent),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty ?? true) {
                               return 'Vui lòng nhập vĩ độ';
@@ -224,7 +246,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                         child: TextFormField(
                           controller: _longitudeController,
                           keyboardType: TextInputType.number,
-                          decoration: adminInputDecoration('Kinh độ'),
+                          decoration: adminInputDecoration(
+                            'Kinh độ',
+                            hintText: '106.660172',
+                            prefixIcon: const Icon(Icons.my_location, color: AdminColors.accent),
+                          ),
                           validator: (value) {
                             if (value?.isEmpty ?? true) {
                               return 'Vui lòng nhập kinh độ';
@@ -241,7 +267,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _imageController,
-                    decoration: adminInputDecoration('URL hình ảnh'),
+                    decoration: adminInputDecoration(
+                      'URL hình ảnh',
+                      hintText: 'https://example.com/image.jpg',
+                      prefixIcon: const Icon(Icons.image, color: AdminColors.accent),
+                    ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
                         return 'Vui lòng nhập URL hình ảnh';
@@ -249,17 +279,26 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
-                      Expanded(child: AdminPrimaryButton(
-                        label: _editingBranch != null ? 'Cập nhật' : 'Thêm mới',
-                        icon: _editingBranch != null ? Icons.save : Icons.add,
-                        onPressed: _isLoading ? null : _addOrUpdateBranch,
-                      )),
+                      Expanded(
+                        child: AdminPrimaryButton(
+                          label: _editingBranch != null ? 'Cập nhật' : 'Thêm mới',
+                          icon: _editingBranch != null ? Icons.save : Icons.add,
+                          isLoading: _isLoading,
+                          onPressed: _isLoading ? null : _addOrUpdateBranch,
+                        ),
+                      ),
                       const SizedBox(width: 16),
                       if (_editingBranch != null)
-                        Expanded(child: AdminDangerButton(label: 'Hủy', onPressed: _clearForm)),
+                        Expanded(
+                          child: AdminDangerButton(
+                            label: 'Hủy',
+                            icon: Icons.close,
+                            onPressed: _clearForm,
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -294,46 +333,136 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                 }
                 
                 return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 20),
                   itemCount: branches.length,
                   itemBuilder: (context, index) {
                     final branch = branches[index];
                     return AdminCard(
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundImage: branch.image.isNotEmpty
-                              ? NetworkImage(branch.image)
-                              : null,
-                          child: branch.image.isEmpty
-                              ? const Icon(Icons.store)
-                              : null,
-                        ),
-                        title: Text(
-                          branch.name,
-                          style: const TextStyle(color: AdminColors.textPrimary),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
                           children: [
-                            Text(
-                              branch.address,
-                              style: const TextStyle(color: AdminColors.textSecondary),
+                            // Branch Image
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AdminColors.border,
+                                  width: 2,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: branch.image.isNotEmpty
+                                    ? Image.network(
+                                        branch.image,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            color: AdminColors.surfaceAlt,
+                                            child: const Icon(
+                                              Icons.store,
+                                              color: AdminColors.textSecondary,
+                                              size: 30,
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : Container(
+                                        color: AdminColors.surfaceAlt,
+                                        child: const Icon(
+                                          Icons.store,
+                                          color: AdminColors.textSecondary,
+                                          size: 30,
+                                        ),
+                                      ),
+                              ),
                             ),
-                            Text(
-                              branch.hours,
-                              style: const TextStyle(color: AdminColors.textSecondary),
+                            const SizedBox(width: 16),
+                            
+                            // Branch Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    branch.name,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AdminColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        size: 16,
+                                        color: AdminColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          branch.address,
+                                          style: const TextStyle(
+                                            color: AdminColors.textSecondary,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        size: 16,
+                                        color: AdminColors.info,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        branch.hours,
+                                        style: const TextStyle(
+                                          color: AdminColors.textSecondary,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blue),
-                              onPressed: () => _editBranch(branch),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteBranch(branch.id),
+                            
+                            // Actions
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AdminColors.info.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.edit, color: AdminColors.info),
+                                    onPressed: () => _editBranch(branch),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AdminColors.danger.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.delete, color: AdminColors.danger),
+                                    onPressed: () => _deleteBranch(branch.id),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

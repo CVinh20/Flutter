@@ -1,15 +1,24 @@
 // lib/screens/booking_screen.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/service.dart';
 import '../models/booking.dart';
 import '../models/stylist.dart';
 import '../models/branch.dart';
+import '../models/voucher.dart';
 import '../services/firestore_service.dart';
 import '../main.dart';
 
 class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key});
+  final Service? service;
+  final Branch? initialBranch;
+  
+  const BookingScreen({
+    super.key,
+    this.service,
+    this.initialBranch,
+  });
 
   @override
   BookingScreenState createState() => BookingScreenState();
@@ -17,14 +26,20 @@ class BookingScreen extends StatefulWidget {
 
 class BookingScreenState extends State<BookingScreen> with TickerProviderStateMixin {
   final FirestoreService _firestoreService = FirestoreService();
+  Service? selectedService; // Thêm biến để lưu service được chọn
   Stylist? selectedStylist;
   DateTime? selectedDate;
   TimeOfDay? selectedTime;
   Branch? selectedBranch;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _voucherController = TextEditingController();
   late AnimationController _controller;
   bool _isLoading = false;
+  List<Service> _services = []; // Thêm danh sách services
+  Voucher? _appliedVoucher;
+  double _discount = 0.0;
+  String? _voucherError;
 
   @override
   void initState() {
@@ -34,10 +49,34 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
       vsync: this,
     )..forward();
 
+    // Khởi tạo các giá trị từ widget
+    selectedService = widget.service;
+    selectedBranch = widget.initialBranch;
+
+    // Lấy thông tin user
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _nameController.text = user.displayName ?? '';
       _phoneController.text = user.phoneNumber ?? '';
+    }
+
+    // Load danh sách services nếu chưa có service được chọn
+    if (selectedService == null) {
+      _loadServices();
+    }
+  }
+
+  Future<void> _loadServices() async {
+    try {
+      _firestoreService.getServices().listen((services) {
+        if (mounted) {
+          setState(() {
+            _services = services;
+          });
+        }
+      });
+    } catch (e) {
+      print('Lỗi khi tải danh sách dịch vụ: $e');
     }
   }
 
@@ -46,7 +85,83 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
     _controller.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _voucherController.dispose();
     super.dispose();
+  }
+
+  Future<void> _applyVoucher(Service service) async {
+    final code = _voucherController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      setState(() {
+        _voucherError = 'Vui lòng nhập mã voucher';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _voucherError = null;
+    });
+
+    try {
+      final voucher = await _firestoreService.getVoucherByCode(code);
+      
+      if (voucher == null) {
+        setState(() {
+          _voucherError = 'Mã voucher không tồn tại';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      if (!voucher.isValid) {
+        setState(() {
+          _voucherError = 'Mã voucher đã hết hạn hoặc không khả dụng';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final orderValue = service.price;
+      if (orderValue < voucher.minOrderValue) {
+        setState(() {
+          _voucherError = 'Đơn hàng tối thiểu ${voucher.minOrderValue.toStringAsFixed(0)}đ';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final discount = voucher.calculateDiscount(orderValue);
+      setState(() {
+        _appliedVoucher = voucher;
+        _discount = discount;
+        _voucherError = null;
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Áp dụng voucher thành công! Giảm ${discount.toStringAsFixed(0)}đ'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _voucherError = 'Lỗi khi áp dụng voucher';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _removeVoucher() {
+    setState(() {
+      _appliedVoucher = null;
+      _discount = 0.0;
+      _voucherController.clear();
+      _voucherError = null;
+    });
   }
   
   Future<void> _confirmBooking(Service service) async {
@@ -80,13 +195,28 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
       customerName: _nameController.text.trim(),
       customerPhone: _phoneController.text.trim(),
       branchName: selectedBranch!.name,
+      amount: _appliedVoucher != null ? service.price - _discount : service.price,
+      isPaid: false,
+      voucherCode: _appliedVoucher?.code,
+      discount: _appliedVoucher != null ? _discount : null,
+      originalAmount: _appliedVoucher != null ? service.price : null,
     );
     
     try {
       await _firestoreService.addBooking(newBooking);
+      
+      // Nếu có voucher, cập nhật số lượng đã sử dụng
+      if (_appliedVoucher != null) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await _firestoreService.applyVoucher(_appliedVoucher!.id, user.uid);
+        }
+      }
+      
       if(mounted) {
         print('Booking created successfully, navigating...');
-        // Show success message and navigate back to home with bookings tab selected
+        
+        // Show success message and navigate back to home
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Đặt lịch thành công!'),
@@ -95,6 +225,7 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
+        
         // Navigate back to home screen and switch to bookings tab
         Navigator.pop(context);
         print('Navigator.pop completed, calling navigateToBookings...');
@@ -185,6 +316,11 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                     ),
+                    
+                    SizedBox(height: 28),
+                    _buildSectionTitle('Mã giảm giá', Icons.local_offer_outlined),
+                    SizedBox(height: 16),
+                    _buildVoucherSection(service),
                     
                     SizedBox(height: 28),
                     _buildSectionTitle('Chọn chi nhánh', Icons.business_rounded),
@@ -452,7 +588,7 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
           context: context,
           initialDate: DateTime.now().add(Duration(days: 1)),
           firstDate: DateTime.now(),
-          lastDate: DateTime.now().add(Duration(days: 30)),
+          lastDate: DateTime.now().add(Duration(days: 60)),
           builder: (context, child) {
             return Theme(
               data: Theme.of(context).copyWith(
@@ -583,6 +719,208 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
     );
   }
 
+  Widget _buildVoucherSection(Service service) {
+    final finalAmount = service.price - _discount;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF0891B2).withOpacity(0.1),
+                const Color(0xFF22D3EE).withOpacity(0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF0891B2).withOpacity(0.3)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Voucher input field with apply button
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _voucherController,
+                      decoration: InputDecoration(
+                        hintText: 'Nhập mã voucher',
+                        prefixIcon: const Icon(Icons.confirmation_number, color: Color(0xFF0891B2)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF0891B2), width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      textCapitalization: TextCapitalization.characters,
+                      enabled: _appliedVoucher == null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _appliedVoucher == null
+                      ? ElevatedButton(
+                          onPressed: _isLoading ? null : () => _applyVoucher(service),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0891B2),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text('Áp dụng', style: TextStyle(fontWeight: FontWeight.bold)),
+                        )
+                      : IconButton(
+                          onPressed: _removeVoucher,
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.red.withOpacity(0.1),
+                          ),
+                        ),
+                ],
+              ),
+              
+              // Error message
+              if (_voucherError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _voucherError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
+              
+              // Applied voucher info
+              if (_appliedVoucher != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _appliedVoucher!.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                'Giảm ${_discount.toStringAsFixed(0)}đ',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
+              // Price summary
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Giá gốc:',
+                    style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                  ),
+                  Text(
+                    '${service.price.toStringAsFixed(0)}đ',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: const Color(0xFF64748B),
+                      decoration: _discount > 0 ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                ],
+              ),
+              if (_discount > 0) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Giảm giá:',
+                      style: TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '-${_discount.toStringAsFixed(0)}đ',
+                      style: const TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Tổng thanh toán:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  ),
+                  Text(
+                    '${finalAmount.toStringAsFixed(0)}đ',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0891B2),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBranchSelector() {
     return InkWell(
       onTap: () async {
@@ -590,6 +928,7 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
+          enableDrag: false,
           builder: (context) => _BranchPicker(
             firestoreService: _firestoreService,
           ),
@@ -641,6 +980,7 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
       ),
     );
   }
+
 }
 
 class _BranchPicker extends StatelessWidget {
@@ -651,9 +991,9 @@ class _BranchPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: const Color.fromARGB(255, 250, 248, 248),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: Colors.grey.shade700),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.6,
@@ -668,7 +1008,7 @@ class _BranchPicker extends StatelessWidget {
               height: 6,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.grey.shade600, Colors.grey.shade400],
+                  colors: [Color(0xFF0891B2), Color(0xFF0891B2).withOpacity(0.6)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
@@ -681,7 +1021,7 @@ class _BranchPicker extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
-                color: Colors.white,
+                color: Color(0xFF0891B2),
               ),
             ),
             SizedBox(height: 20),
@@ -703,9 +1043,16 @@ class _BranchPicker extends StatelessWidget {
                       return Container(
                         margin: EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2D2D2D),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade700),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: ListTile(
                           contentPadding: EdgeInsets.all(16),
@@ -719,10 +1066,10 @@ class _BranchPicker extends StatelessWidget {
                               errorBuilder: (_, __, ___) => Container(
                                 width: 60,
                                 height: 60,
-                                color: Colors.grey.shade800,
+                                color: Color(0xFF0891B2).withOpacity(0.1),
                                 child: Icon(
                                   Icons.business_rounded,
-                                  color: Colors.grey.shade600,
+                                  color: Color(0xFF0891B2),
                                   size: 30,
                                 ),
                               ),
@@ -732,7 +1079,7 @@ class _BranchPicker extends StatelessWidget {
                             branch.name,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: Color(0xFF1E293B),
                               fontSize: 16,
                             ),
                           ),
@@ -744,7 +1091,7 @@ class _BranchPicker extends StatelessWidget {
                                 branch.address,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade400,
+                                  color: Color(0xFF0891B2),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -758,7 +1105,7 @@ class _BranchPicker extends StatelessWidget {
                                     branch.rating.toString(),
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white,
+                                      color: Color(0xFF64748B),
                                     ),
                                   ),
                                 ],
@@ -768,13 +1115,13 @@ class _BranchPicker extends StatelessWidget {
                           trailing: Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Color(0xFF0891B2).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               Icons.arrow_forward_ios_rounded,
                               size: 16,
-                              color: Colors.grey.shade400,
+                              color: Color(0xFF0891B2),
                             ),
                           ),
                           onTap: () => Navigator.pop(context, branch),

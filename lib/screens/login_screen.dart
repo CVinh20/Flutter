@@ -154,113 +154,104 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo Container với hiệu ứng đẹp
+                      // Logo Container nhỏ gọn hơn
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.15),
-                              blurRadius: 30,
-                              offset: const Offset(0, 10),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
                         child: Image.asset(
-                          'assets/images/gg.png', // Logo của bạn
-                          width: 120,
-                          height: 120,
+                          'assets/images/gg.png',
+                          width: 70,
+                          height: 70,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
                             return Icon(
                               Icons.content_cut_rounded,
-                              size: 100,
-                              color: Colors.white,
+                              size: 60,
+                              color: Color(0xFF0891B2),
                             );
                           },
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 20),
                       
-                      // Title
+                      // Title gọn hơn
                       Text(
-                        'GENTLEMEN\'S',
+                        'GENTLEMEN\'S GROOMING',
                         style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w300,
-                          color: Colors.white,
-                          letterSpacing: 4,
-                        ),
-                      ),
-                      Text(
-                        'GROOMING',
-                        style: const TextStyle(
-                          fontSize: 34,
+                          fontSize: 26,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          letterSpacing: 2,
+                          letterSpacing: 1.5,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         'Chào mừng trở lại',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           color: Colors.white.withOpacity(0.9),
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 28),
 
-                      // Card Form
+                      // Card Form gọn hơn
                       Container(
                         constraints: const BoxConstraints(maxWidth: 420),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.15),
-                              blurRadius: 30,
-                              offset: const Offset(0, 15),
+                              blurRadius: 25,
+                              offset: const Offset(0, 12),
                             ),
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(28),
+                          padding: const EdgeInsets.all(24),
                           child: Form(
                             key: _formKey,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // Email Field
+                                // Email Field gọn hơn
                                 TextFormField(
                                   controller: _emailCtrl,
                                   keyboardType: TextInputType.emailAddress,
-                                  style: TextStyle(fontSize: 16),
+                                  style: TextStyle(fontSize: 15),
                                   decoration: InputDecoration(
                                     labelText: 'Email',
                                     hintText: 'your@email.com',
-                                    labelStyle: TextStyle(color: Color(0xFF6B7280)),
-                                    hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
-                                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF0891B2)),
+                                    labelStyle: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+                                    hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                                    prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF0891B2), size: 20),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                                     ),
                                     enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       borderSide: const BorderSide(color: Color(0xFF0891B2), width: 2),
                                     ),
                                     filled: true,
                                     fillColor: const Color(0xFFF9FAFB),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                   ),
                                   validator: (v) {
                                     final value = v?.trim() ?? '';
@@ -270,43 +261,44 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     return null;
                                   },
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 16),
                                 
-                                // Password Field
+                                // Password Field gọn hơn
                                 TextFormField(
                                   controller: _passCtrl,
                                   obscureText: _obscurePassword,
-                                  style: TextStyle(fontSize: 16),
+                                  style: TextStyle(fontSize: 15),
                                   decoration: InputDecoration(
                                     labelText: 'Mật khẩu',
                                     hintText: '••••••••',
-                                    labelStyle: TextStyle(color: Color(0xFF6B7280)),
-                                    hintStyle: TextStyle(color: Color(0xFF9CA3AF)),
-                                    prefixIcon: Icon(Icons.lock_outline, color: Color(0xFF6B7280)),
+                                    labelStyle: TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+                                    hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                                    prefixIcon: Icon(Icons.lock_outline, color: Color(0xFF6B7280), size: 20),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _obscurePassword ? Icons.visibility_off : Icons.visibility,
                                         color: Color(0xFF6B7280),
+                                        size: 20,
                                       ),
                                       onPressed: () {
                                         setState(() => _obscurePassword = !_obscurePassword);
                                       },
                                     ),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide(color: Color(0xFFD1D5DB)),
                                     ),
                                     enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide(color: Color(0xFFD1D5DB)),
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       borderSide: const BorderSide(color: Color(0xFF0891B2), width: 2),
                                     ),
                                     filled: true,
                                     fillColor: const Color(0xFFF9FAFB),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                   ),
                                   validator: (v) {
                                     if (v == null || v.isEmpty) return 'Vui lòng nhập mật khẩu';
@@ -314,27 +306,33 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     return null;
                                   },
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 8),
                                 
                                 // Forgot Password
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
                                     onPressed: () => Navigator.of(context).pushNamed('/forgot-password'),
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                      minimumSize: Size(0, 0),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
                                     child: const Text(
                                       'Quên mật khẩu?',
                                       style: TextStyle(
                                         color: Color(0xFF0891B2),
                                         fontWeight: FontWeight.w600,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 16),
                                 
-                                // Login Button
+                                // Login Button gọn hơn
                                 SizedBox(
-                                  height: 56,
+                                  height: 50,
                                   child: ElevatedButton(
                                     onPressed: _handleEmailSignIn,
                                     style: ElevatedButton.styleFrom(
@@ -343,13 +341,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       elevation: 6,
                                       shadowColor: const Color(0xFF0891B2).withOpacity(0.4),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
+                                        borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
                                     child: Text(
                                       'Đăng nhập',
                                       style: TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 17,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
                                       ),
@@ -357,28 +355,28 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   ),
                                 ),
                                 
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 18),
                                 
-                                // Divider
+                                // Divider gọn hơn
                                 Row(
                                   children: [
-                                    Expanded(child: Divider(color: Color(0xFFD1D5DB))),
+                                    Expanded(child: Divider(color: Color(0xFFD1D5DB), thickness: 1)),
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
                                       child: Text(
                                         'HOẶC',
                                         style: TextStyle(
                                           color: Color(0xFF6B7280),
-                                          fontSize: 12,
+                                          fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
-                                    Expanded(child: Divider(color: Color(0xFFD1D5DB))),
+                                    Expanded(child: Divider(color: Color(0xFFD1D5DB), thickness: 1)),
                                   ],
                                 ),
                                 
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 18),
                                 
                                 // Google Sign In
                                 GoogleSignInButton(
@@ -391,29 +389,31 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         ),
                       ),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 20),
                       
-                      // Register Link
+                      // Register Link gọn hơn
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             'Chưa có tài khoản? ',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 15,
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: 14,
                             ),
                           ),
                           TextButton(
                             onPressed: () => Navigator.of(context).pushNamed('/register'),
                             style: TextButton.styleFrom(
-                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              minimumSize: Size(0, 0),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             child: const Text(
                               'Đăng ký ngay',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 15,
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 decoration: TextDecoration.underline,
                                 decorationColor: Colors.white,

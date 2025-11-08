@@ -1,0 +1,102 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Kiểm tra xem user đã đăng nhập chưa
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Kiểm tra xem user có phải là admin không
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // Kiểm tra xem user có phải là chủ của payment không
+    function isPaymentOwner(paymentData) {
+      return isAuthenticated() && paymentData.userId == request.auth.uid;
+    }
+    
+    // Rules cho collection users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // Rules cho collection bookings
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // Rules cho collection services
+    match /services/{serviceId} {
+      allow read: if true;  // Cho phép đọc công khai
+      allow write: if isAdmin();
+    }
+    
+    // Rules cho collection branches
+    match /branches/{branchId} {
+      allow read: if true;  // Cho phép đọc công khai
+      allow write: if isAdmin();
+    }
+    
+    // Rules cho collection stylists
+    match /stylists/{stylistId} {
+      allow read: if true;  // Cho phép đọc công khai
+      allow write: if isAdmin();
+    }
+    
+    // Rules cho collection categories
+    match /categories/{categoryId} {
+      allow read: if true;  // Cho phép đọc công khai
+      allow write: if isAdmin();
+    }
+
+    // Rules cho collection vouchers
+    match /vouchers/{voucherId} {
+      allow read: if true;  // Cho phép đọc công khai
+      allow write: if isAdmin();  // Chỉ admin mới có thể tạo/sửa/xóa voucher
+    }
+
+    // Rules cho collection payments
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Rules cho collection transactions
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Rules cho collection paymentMethods
+    match /paymentMethods/{methodId} {
+      allow read: if true;  // Cho phép đọc công khai
+      allow write: if isAdmin();
+    }
+  }
+}

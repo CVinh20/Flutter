@@ -220,16 +220,6 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         child: SafeArea(
           child: Stack(
             children: [
-              // Back Button
-              Positioned(
-                top: 16,
-                left: 16,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back_ios_new, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-              
               // Main Content
               Center(
                 child: SingleChildScrollView(
@@ -540,6 +530,32 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                             ],
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Back Button - Đặt cuối cùng để nằm trên cùng
+              Positioned(
+                top: 16,
+                left: 16,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      ),
+                      child: Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
                   ),

@@ -1,17 +1,21 @@
 // lib/screens/quick_booking_screen.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import '../models/service.dart';
 import '../models/stylist.dart';
 import '../models/branch.dart';
+import '../models/category.dart';
+import '../models/voucher.dart';
 import '../services/firestore_service.dart';
 import '../models/booking.dart';
 import '../services/notification_service.dart';
 import '../main.dart';
 
 class QuickBookingScreen extends StatefulWidget {
-  const QuickBookingScreen({super.key});
+  final Branch? preSelectedBranch;
+  const QuickBookingScreen({super.key, this.preSelectedBranch});
 
   @override
   State<QuickBookingScreen> createState() => _QuickBookingScreenState();
@@ -29,10 +33,20 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _voucherController = TextEditingController();
+  
+  Voucher? _appliedVoucher;
+  double _discount = 0.0;
+  String? _voucherError;
 
   @override
   void initState() {
     super.initState();
+    // Set pre-selected branch if provided
+    if (widget.preSelectedBranch != null) {
+      selectedBranch = widget.preSelectedBranch;
+    }
+    
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _nameController.text = user.displayName ?? '';
@@ -44,7 +58,73 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _voucherController.dispose();
     super.dispose();
+  }
+
+  Future<void> _applyVoucher() async {
+    final code = _voucherController.text.trim().toUpperCase();
+    if (code.isEmpty) {
+      setState(() {
+        _voucherError = 'Vui lòng nhập mã voucher';
+      });
+      return;
+    }
+
+    if (selectedService == null) {
+      setState(() {
+        _voucherError = 'Vui lòng chọn dịch vụ trước';
+      });
+      return;
+    }
+
+    try {
+      final voucher = await _firestoreService.getVoucherByCode(code);
+      
+      if (voucher == null) {
+        setState(() {
+          _voucherError = 'Mã voucher không tồn tại';
+        });
+        return;
+      }
+
+      if (!voucher.isValid) {
+        setState(() {
+          _voucherError = 'Mã voucher đã hết hạn hoặc không khả dụng';
+        });
+        return;
+      }
+
+      final orderValue = selectedService!.price;
+      if (orderValue < voucher.minOrderValue) {
+        setState(() {
+          _voucherError = 'Đơn hàng tối thiểu ${voucher.minOrderValue.toStringAsFixed(0)}đ';
+        });
+        return;
+      }
+
+      final discount = voucher.calculateDiscount(orderValue);
+      setState(() {
+        _appliedVoucher = voucher;
+        _discount = discount;
+        _voucherError = null;
+      });
+
+      EasyLoading.showSuccess('Áp dụng voucher thành công! Giảm ${discount.toStringAsFixed(0)}đ');
+    } catch (e) {
+      setState(() {
+        _voucherError = 'Lỗi khi áp dụng voucher';
+      });
+    }
+  }
+
+  void _removeVoucher() {
+    setState(() {
+      _appliedVoucher = null;
+      _discount = 0.0;
+      _voucherController.clear();
+      _voucherError = null;
+    });
   }
 
   void _resetForm() {
@@ -86,15 +166,28 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
       customerName: _nameController.text.trim(),
       customerPhone: _phoneController.text.trim(),
       branchName: selectedBranch!.name,
+      amount: _appliedVoucher != null ? selectedService!.price - _discount : selectedService!.price,
+      isPaid: false,
+      voucherCode: _appliedVoucher?.code,
+      discount: _appliedVoucher != null ? _discount : null,
+      originalAmount: _appliedVoucher != null ? selectedService!.price : null,
     );
 
     try {
       final createdBooking = await _firestoreService.addBooking(newBooking);
       await _notificationService.scheduleBookingNotification(createdBooking);
+      
+      // Nếu có voucher, cập nhật số lượng đã sử dụng
+      if (_appliedVoucher != null) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await _firestoreService.applyVoucher(_appliedVoucher!.id, user.uid);
+        }
+      }
 
       if (mounted) {
-        _resetForm();
         EasyLoading.dismiss();
+        
         // Show success message and navigate back to home
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -104,6 +197,10 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
+        
+        // Reset form after showing success message
+        _resetForm();
+        
         // Navigate back to home screen and switch to bookings tab
         Navigator.pop(context);
         // Add a small delay to ensure Navigator.pop is fully completed
@@ -219,6 +316,11 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
                   _buildFormSection(
                     title: 'Thông tin khách hàng',
                     child: _buildCustomerInfo(),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildFormSection(
+                    title: 'Mã giảm giá',
+                    child: _buildVoucherSection(),
                   ),
                   const SizedBox(height: 20),
                   _buildFormSection(
@@ -402,6 +504,181 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
     );
   }
 
+  Widget _buildVoucherSection() {
+    final finalAmount = selectedService != null ? selectedService!.price - _discount : 0.0;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Voucher input field with apply button
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _voucherController,
+                decoration: InputDecoration(
+                  hintText: 'Nhập mã voucher',
+                  prefixIcon: const Icon(Icons.confirmation_number, color: Color(0xFF0891B2)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF0891B2), width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                textCapitalization: TextCapitalization.characters,
+                enabled: _appliedVoucher == null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            _appliedVoucher == null
+                ? ElevatedButton(
+                    onPressed: _applyVoucher,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0891B2),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text('Áp dụng', style: TextStyle(fontWeight: FontWeight.bold)),
+                  )
+                : IconButton(
+                    onPressed: _removeVoucher,
+                    icon: const Icon(Icons.close, color: Colors.red),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.red.withOpacity(0.1),
+                    ),
+                  ),
+          ],
+        ),
+        
+        // Error message
+        if (_voucherError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _voucherError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+        
+        // Applied voucher info
+        if (_appliedVoucher != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _appliedVoucher!.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          'Giảm ${_discount.toStringAsFixed(0)}đ',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        
+        // Price summary
+        if (selectedService != null) ...[
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Giá gốc:',
+                style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+              ),
+              Text(
+                '${selectedService!.price.toStringAsFixed(0)}đ',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: const Color(0xFF64748B),
+                  decoration: _discount > 0 ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ],
+          ),
+          if (_discount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Giảm giá:',
+                  style: TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '-${_discount.toStringAsFixed(0)}đ',
+                  style: const TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Tổng thanh toán:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              Text(
+                '${finalAmount.toStringAsFixed(0)}đ',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0891B2),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildSelectBranch(BuildContext context) {
     return _selectButton(
       icon: Icons.business_rounded,
@@ -412,6 +689,7 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
           context: context,
           backgroundColor: Colors.transparent,
           isScrollControlled: true,
+          enableDrag: false,
           builder: (context) => _BranchPicker(firestoreService: _firestoreService),
         );
         if (picked != null) setState(() => selectedBranch = picked);
@@ -429,6 +707,7 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
           context: context,
           backgroundColor: Colors.transparent,
           isScrollControlled: true,
+          enableDrag: false,
           builder: (context) => _ServicePicker(firestoreService: _firestoreService),
         );
         if (picked != null) setState(() => selectedService = picked);
@@ -453,7 +732,7 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(Duration(days: 30)),
+                    lastDate: DateTime.now().add(Duration(days: 60)),
                     builder: (context, child) {
                       return Theme(
                         data: Theme.of(context).copyWith(
@@ -510,8 +789,9 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
           onTap: () async {
             final Stylist? picked = await showModalBottomSheet<Stylist>(
               context: context,
-              backgroundColor: Colors.transparent,
+              backgroundColor: const Color.fromARGB(255, 255, 255, 255),
               isScrollControlled: true,
+              enableDrag: false,
               builder: (context) => _StylistPicker(firestoreService: _firestoreService),
             );
             if (picked != null) setState(() => selectedStylist = picked);
@@ -572,9 +852,52 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
 
 // --- PICKER WIDGETS ---
 
-class _ServicePicker extends StatelessWidget {
+class _ServicePicker extends StatefulWidget {
   final FirestoreService firestoreService;
   const _ServicePicker({required this.firestoreService});
+
+  @override
+  State<_ServicePicker> createState() => _ServicePickerState();
+}
+
+class _ServicePickerState extends State<_ServicePicker> with TickerProviderStateMixin {
+  late TabController _tabController;
+  List<Category> _categories = [];
+  List<Service> _allServices = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 1, vsync: this);
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    // Load categories
+    widget.firestoreService.getCategories().listen((categories) {
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _tabController = TabController(length: _categories.length + 1, vsync: this);
+        });
+      }
+    });
+
+    // Load services
+    widget.firestoreService.getServices().listen((services) {
+      if (mounted) {
+        setState(() {
+          _allServices = services;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -591,9 +914,9 @@ class _ServicePicker extends StatelessWidget {
         ],
       ),
       child: DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
         expand: false,
         builder: (context, controller) => Column(
           children: [
@@ -603,7 +926,7 @@ class _ServicePicker extends StatelessWidget {
               height: 6,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.grey.shade600, Colors.grey.shade400],
+                  colors: [Color(0xFF0891B2), Color(0xFF0891B2).withOpacity(0.6)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
@@ -616,96 +939,179 @@ class _ServicePicker extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
-                color: Colors.white,
+                color: Colors.black,
               ),
             ),
-            SizedBox(height: 20),
-            Expanded(
-              child: StreamBuilder<List<Service>>(
-                stream: firestoreService.getServices(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-                  final services = snapshot.data!;
-                  return ListView.separated(
-                    controller: controller,
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: services.length,
-                    separatorBuilder: (context, index) => Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final s = services[index];
-                      return Container(
-                        margin: EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2D2D2D),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade700),
-                        ),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.all(16),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              s.image,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 60,
-                                height: 60,
-                                color: Colors.grey.shade800,
-                                child: Icon(
-                                  Icons.content_cut_rounded,
-                                  color: Colors.grey.shade600,
-                                  size: 30,
-                                ),
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            s.name,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Padding(
-                            padding: EdgeInsets.only(top: 4),
-                            child: Text(
-                              '${s.price.toStringAsFixed(0)}đ',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                          trailing: Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              size: 16,
-                              color: Colors.grey.shade400,
-                            ),
-                          ),
-                          onTap: () => Navigator.pop(context, s),
-                        ),
-                      );
-                    },
-                  );
-                },
+            if (_categories.isNotEmpty) ...[
+              SizedBox(height: 16),
+              TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                indicatorColor: Color(0xFF0891B2),
+                labelColor: Color(0xFF0891B2),
+                unselectedLabelColor: Colors.grey.shade600,
+                tabs: [
+                  Tab(text: 'Tất cả'),
+                  ..._categories.map((category) => Tab(text: category.name)),
+                ],
               ),
+            ],
+            SizedBox(height: 16),
+            Expanded(
+              child: _categories.isEmpty
+                  ? StreamBuilder<List<Service>>(
+                      stream: widget.firestoreService.getServices(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+                        return _buildServicesList(snapshot.data!, controller);
+                      },
+                    )
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildServicesList(_allServices, controller),
+                        ..._categories.map((category) => 
+                            _buildServicesList(_getServicesByCategory(category.id), controller)),
+                      ],
+                    ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildServicesList(List<Service> services, ScrollController controller) {
+    if (services.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.build_circle_outlined,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Chưa có dịch vụ nào',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      controller: controller,
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      itemCount: services.length,
+      separatorBuilder: (context, index) => Divider(height: 1),
+      itemBuilder: (context, index) {
+        final s = services[index];
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: ListTile(
+            contentPadding: EdgeInsets.all(16),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF0891B2).withOpacity(0.1),
+                      Color(0xFF0891B2).withOpacity(0.05),
+                    ],
+                  ),
+                ),
+                child: s.image.isNotEmpty
+                    ? Image.network(
+                        s.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.build_circle_outlined,
+                          color: Color(0xFF0891B2),
+                          size: 30,
+                        ),
+                      )
+                    : Icon(
+                        Icons.build_circle_outlined,
+                        color: Color(0xFF0891B2),
+                        size: 30,
+                      ),
+              ),
+            ),
+            title: Text(
+              s.name,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                    SizedBox(width: 4),
+                    Text(
+                      s.duration,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 2),
+                Text(
+                  '${s.price.toStringAsFixed(0)}đ',
+                  style: TextStyle(
+                    color: Color(0xFF0891B2),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            trailing: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFF0891B2).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Color(0xFF0891B2),
+              ),
+            ),
+            onTap: () => Navigator.pop(context, s),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Service> _getServicesByCategory(String categoryId) {
+    return _allServices.where((service) => service.categoryId == categoryId).toList();
   }
 }
 
@@ -734,7 +1140,7 @@ class _StylistPicker extends StatelessWidget {
               height: 6,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.grey.shade600, Colors.grey.shade400],
+                  colors: [Color(0xFF0891B2), Color(0xFF0891B2).withOpacity(0.6)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
@@ -747,7 +1153,7 @@ class _StylistPicker extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
-                color: Colors.white,
+                color: Color(0xFF0891B2),
               ),
             ),
             SizedBox(height: 20),
@@ -769,9 +1175,16 @@ class _StylistPicker extends StatelessWidget {
                       return Container(
                         margin: EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2D2D2D),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade700),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: ListTile(
                           contentPadding: EdgeInsets.all(16),
@@ -785,10 +1198,10 @@ class _StylistPicker extends StatelessWidget {
                               errorBuilder: (_, __, ___) => Container(
                                 width: 60,
                                 height: 60,
-                                color: Colors.grey.shade800,
+                                color: Color(0xFF0891B2).withOpacity(0.1),
                                 child: Icon(
                                   Icons.person_outline,
-                                  color: Colors.grey.shade600,
+                                  color: Color(0xFF0891B2),
                                   size: 30,
                                 ),
                               ),
@@ -798,7 +1211,7 @@ class _StylistPicker extends StatelessWidget {
                             st.name,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: Color(0xFF1E293B),
                               fontSize: 16,
                             ),
                           ),
@@ -810,7 +1223,7 @@ class _StylistPicker extends StatelessWidget {
                                 st.rating.toString(),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                  color: Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -818,13 +1231,13 @@ class _StylistPicker extends StatelessWidget {
                           trailing: Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Color(0xFF0891B2).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               Icons.arrow_forward_ios_rounded,
                               size: 16,
-                              color: Colors.grey.shade400,
+                              color: Color(0xFF0891B2),
                             ),
                           ),
                           onTap: () => Navigator.pop(context, st),
@@ -850,7 +1263,7 @@ class _BranchPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: const Color.fromARGB(255, 250, 248, 248),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         border: Border.all(color: Colors.grey.shade700),
       ),
@@ -867,7 +1280,7 @@ class _BranchPicker extends StatelessWidget {
               height: 6,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.grey.shade600, Colors.grey.shade400],
+                  colors: [Color(0xFF0891B2), Color(0xFF0891B2).withOpacity(0.6)],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
@@ -880,7 +1293,7 @@ class _BranchPicker extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
-                color: Colors.white,
+                color: Color(0xFF0891B2),
               ),
             ),
             SizedBox(height: 20),
@@ -902,9 +1315,16 @@ class _BranchPicker extends StatelessWidget {
                       return Container(
                         margin: EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2D2D2D),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade700),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: ListTile(
                           contentPadding: EdgeInsets.all(16),
@@ -918,10 +1338,10 @@ class _BranchPicker extends StatelessWidget {
                               errorBuilder: (_, __, ___) => Container(
                                 width: 60,
                                 height: 60,
-                                color: Colors.grey.shade800,
+                                color: Color(0xFF0891B2).withOpacity(0.1),
                                 child: Icon(
                                   Icons.business_rounded,
-                                  color: Colors.grey.shade600,
+                                  color: Color(0xFF0891B2),
                                   size: 30,
                                 ),
                               ),
@@ -931,7 +1351,7 @@ class _BranchPicker extends StatelessWidget {
                             branch.name,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: Color(0xFF1E293B),
                               fontSize: 16,
                             ),
                           ),
@@ -943,7 +1363,7 @@ class _BranchPicker extends StatelessWidget {
                                 branch.address,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade400,
+                                  color: Color(0xFF0891B2),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -967,13 +1387,13 @@ class _BranchPicker extends StatelessWidget {
                           trailing: Container(
                             padding: EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Color(0xFF0891B2).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               Icons.arrow_forward_ios_rounded,
                               size: 16,
-                              color: Colors.grey.shade400,
+                              color: Color(0xFF0891B2),
                             ),
                           ),
                           onTap: () => Navigator.pop(context, branch),

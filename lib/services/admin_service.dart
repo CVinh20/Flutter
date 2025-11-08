@@ -7,6 +7,39 @@ class AdminService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Đếm tổng số dịch vụ
+  Future<int> getServicesCount() async {
+    final snapshot = await _firestore.collection('services').get();
+    return snapshot.docs.length;
+  }
+
+  // Đếm tổng số chi nhánh
+  Future<int> getBranchesCount() async {
+    final snapshot = await _firestore.collection('branches').get();
+    return snapshot.docs.length;
+  }
+
+  // Đếm tổng số stylist
+  Future<int> getStylistsCount() async {
+    final snapshot = await _firestore.collection('stylists').get();
+    return snapshot.docs.length;
+  }
+
+  // Đếm số đơn đặt lịch trong ngày
+  Future<int> getTodayBookingsCount() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final snapshot = await _firestore
+        .collection('bookings')
+        .where('bookingDate', isGreaterThanOrEqualTo: startOfDay)
+        .where('bookingDate', isLessThanOrEqualTo: endOfDay)
+        .get();
+    
+    return snapshot.docs.length;
+  }
+
   // Tạo tài khoản admin mặc định
   Future<void> createDefaultAdmin() async {
     try {

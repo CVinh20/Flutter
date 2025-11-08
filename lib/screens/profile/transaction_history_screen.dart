@@ -17,7 +17,7 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final NumberFormat currencyFormat =
-      NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+      NumberFormat.currency(symbol: 'đ');
 
   @override
   Widget build(BuildContext context) {
