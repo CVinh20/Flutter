@@ -20,7 +20,6 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _imageController = TextEditingController();
-  final _ratingController = TextEditingController();
   final _experienceController = TextEditingController();
   
   // Controllers for account creation
@@ -35,7 +34,6 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
   void dispose() {
     _nameController.dispose();
     _imageController.dispose();
-    _ratingController.dispose();
     _experienceController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -51,27 +49,36 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
       final stylistData = {
         'name': _nameController.text.trim(),
         'image': _imageController.text.trim(),
-        'rating': double.parse(_ratingController.text.trim()),
+        'rating': 5.0, // Default rating
         'experience': _experienceController.text.trim(),
       };
 
       if (_editingStylist != null) {
         await _firestore.collection('stylists').doc(_editingStylist!.id).update(stylistData);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cập nhật stylist thành công!')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cập nhật stylist thành công!')),
+          );
+        }
       } else {
         await _firestore.collection('stylists').add(stylistData);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Thêm stylist thành công!')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Thêm stylist thành công!')),
+          );
+        }
       }
 
       _clearForm();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -80,9 +87,10 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
   void _clearForm() {
     _nameController.clear();
     _imageController.clear();
-    _ratingController.clear();
     _experienceController.clear();
-    _editingStylist = null;
+    setState(() {
+      _editingStylist = null;
+    });
   }
 
   void _editStylist(Stylist stylist) {
@@ -90,7 +98,6 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
       _editingStylist = stylist;
       _nameController.text = stylist.name;
       _imageController.text = stylist.image;
-      _ratingController.text = stylist.rating.toString();
       _experienceController.text = stylist.experience;
     });
   }
@@ -169,7 +176,7 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Email: ${accountUser!.email}',
+                  'Email: ${accountUser.email}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -348,6 +355,7 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Tên stylist
                   TextFormField(
                     controller: _nameController,
                     decoration: adminInputDecoration(
@@ -363,49 +371,25 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _ratingController,
-                          keyboardType: TextInputType.number,
-                          decoration: adminInputDecoration(
-                            'Đánh giá (0-5)',
-                            hintText: '4.5',
-                            prefixIcon: const Icon(Icons.star, color: AdminColors.warning),
-                          ),
-                          validator: (value) {
-                            if (value?.isEmpty ?? true) {
-                              return 'Vui lòng nhập đánh giá';
-                            }
-                            final rating = double.tryParse(value!);
-                            if (rating == null || rating < 0 || rating > 5) {
-                              return 'Đánh giá phải từ 0-5';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _experienceController,
-                          decoration: adminInputDecoration(
-                            'Kinh nghiệm',
-                            hintText: '3 năm kinh nghiệm',
-                            prefixIcon: const Icon(Icons.work, color: AdminColors.info),
-                          ),
-                          validator: (value) {
-                            if (value?.isEmpty ?? true) {
-                              return 'Vui lòng nhập kinh nghiệm';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                    ],
+                  
+                  // Kinh nghiệm
+                  TextFormField(
+                    controller: _experienceController,
+                    decoration: adminInputDecoration(
+                      'Kinh nghiệm',
+                      hintText: '3 năm kinh nghiệm',
+                      prefixIcon: const Icon(Icons.work, color: AdminColors.info),
+                    ),
+                    validator: (value) {
+                      if (value?.isEmpty ?? true) {
+                        return 'Vui lòng nhập kinh nghiệm';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
+                  
+                  // URL hình ảnh
                   TextFormField(
                     controller: _imageController,
                     decoration: adminInputDecoration(
@@ -421,6 +405,8 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
+                  // Buttons
                   Row(
                     children: [
                       Expanded(
@@ -496,171 +482,228 @@ class _ManageStylistsScreenState extends State<ManageStylistsScreen> {
                     return AdminCard(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: Row(
+                        child: Column(
                           children: [
-                            // Stylist Image
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AdminColors.border,
-                                  width: 2,
-                                ),
-                              ),
-                              child: ClipOval(
-                                child: stylist.image.isNotEmpty
-                                    ? Image.network(
-                                        stylist.image,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
+                            Row(
+                              children: [
+                                // Stylist Image
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: AdminColors.border,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: ClipOval(
+                                    child: stylist.image.isNotEmpty
+                                        ? Image.network(
+                                            stylist.image,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                color: AdminColors.surfaceAlt,
+                                                child: const Icon(
+                                                  Icons.person,
+                                                  color: AdminColors.textSecondary,
+                                                  size: 30,
+                                                ),
+                                              );
+                                            },
+                                          )
+                                        : Container(
                                             color: AdminColors.surfaceAlt,
                                             child: const Icon(
                                               Icons.person,
                                               color: AdminColors.textSecondary,
                                               size: 30,
                                             ),
-                                          );
-                                        },
-                                      )
-                                    : Container(
-                                        color: AdminColors.surfaceAlt,
-                                        child: const Icon(
-                                          Icons.person,
-                                          color: AdminColors.textSecondary,
-                                          size: 30,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            
-                            // Stylist Info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    stylist.name,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AdminColors.textPrimary,
-                                    ),
+                                          ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Row(
+                                ),
+                                const SizedBox(width: 16),
+                                
+                                // Stylist Info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Icon(
-                                        Icons.work,
-                                        size: 16,
-                                        color: AdminColors.info,
-                                      ),
-                                      const SizedBox(width: 6),
                                       Text(
-                                        stylist.experience,
+                                        stylist.name,
                                         style: const TextStyle(
-                                          color: AdminColors.textSecondary,
-                                          fontSize: 14,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AdminColors.textPrimary,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.star,
-                                        size: 16,
-                                        color: AdminColors.warning,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '${stylist.rating.toStringAsFixed(1)}/5',
-                                        style: const TextStyle(
-                                          color: AdminColors.textSecondary,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  FutureBuilder<UserModel?>(
-                                    future: _adminService.getStylistUser(stylist.id),
-                                    builder: (context, snapshot) {
-                                      final hasAccount = snapshot.data != null;
-                                      return Row(
+                                      const SizedBox(height: 8),
+                                      Row(
                                         children: [
                                           Icon(
-                                            hasAccount ? Icons.check_circle : Icons.cancel,
-                                            size: 14,
-                                            color: hasAccount ? AdminColors.success : AdminColors.textTertiary,
+                                            Icons.work,
+                                            size: 16,
+                                            color: AdminColors.info,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            hasAccount ? 'Đã có tài khoản' : 'Chưa có tài khoản',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: hasAccount ? AdminColors.success : AdminColors.textTertiary,
-                                              fontWeight: FontWeight.w500,
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              stylist.experience,
+                                              style: const TextStyle(
+                                                color: AdminColors.textSecondary,
+                                                fontSize: 14,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ],
-                                      );
-                                    },
+                                      ),
+                                      const SizedBox(height: 4),
+                                      FutureBuilder<UserModel?>(
+                                        future: _adminService.getStylistUser(stylist.id),
+                                        builder: (context, snapshot) {
+                                          final hasAccount = snapshot.data != null;
+                                          return Row(
+                                            children: [
+                                              Icon(
+                                                hasAccount ? Icons.check_circle : Icons.cancel,
+                                                size: 14,
+                                                color: hasAccount ? AdminColors.success : AdminColors.textTertiary,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  hasAccount ? 'Đã có tài khoản' : 'Chưa có tài khoản',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: hasAccount ? AdminColors.success : AdminColors.textTertiary,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ),
-                          ],
-                        ),
+                                ),
+                              ],
                             ),
                             
-                            // Actions
+                            // Actions row - moved to bottom for better layout
+                            const SizedBox(height: 12),
                             FutureBuilder<UserModel?>(
                               future: _adminService.getStylistUser(stylist.id),
                               builder: (context, snapshot) {
                                 final hasAccount = snapshot.data != null;
                                 return Row(
-                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     // Account button
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: hasAccount 
-                                            ? AdminColors.success.withOpacity(0.1)
-                                            : AdminColors.warning.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        icon: Icon(
-                                          hasAccount ? Icons.person : Icons.person_add,
-                                          color: hasAccount ? AdminColors.success : AdminColors.warning,
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: hasAccount 
+                                              ? AdminColors.success.withOpacity(0.1)
+                                              : AdminColors.warning.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
-                                        tooltip: hasAccount ? 'Xem tài khoản' : 'Tạo tài khoản',
-                                        onPressed: () => _showCreateAccountDialog(stylist),
+                                        child: InkWell(
+                                          onTap: () => _showCreateAccountDialog(stylist),
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  hasAccount ? Icons.person : Icons.person_add,
+                                                  color: hasAccount ? AdminColors.success : AdminColors.warning,
+                                                  size: 18,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  hasAccount ? 'Xem TK' : 'Tạo TK',
+                                                  style: TextStyle(
+                                                    color: hasAccount ? AdminColors.success : AdminColors.warning,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: AdminColors.info.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        icon: const Icon(Icons.edit, color: AdminColors.info),
-                                        onPressed: () => _editStylist(stylist),
+                                    // Edit button
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AdminColors.info.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: InkWell(
+                                          onTap: () => _editStylist(stylist),
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.edit, color: AdminColors.info, size: 18),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'Sửa',
+                                                  style: TextStyle(
+                                                    color: AdminColors.info,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: AdminColors.danger.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        icon: const Icon(Icons.delete, color: AdminColors.danger),
-                                        onPressed: () => _deleteStylist(stylist.id),
+                                    // Delete button
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AdminColors.danger.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: InkWell(
+                                          onTap: () => _deleteStylist(stylist.id),
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.delete, color: AdminColors.danger, size: 18),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'Xóa',
+                                                  style: TextStyle(
+                                                    color: AdminColors.danger,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],

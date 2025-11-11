@@ -10,7 +10,7 @@ import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/my_bookings_screen.dart';
 import 'screens/account_screen.dart';
-import 'screens/branch_screen.dart';
+import 'screens/shop_screen.dart';
 import 'screens/quick_booking_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
@@ -239,7 +239,7 @@ class MainScreenState extends State<MainScreen> {
 
   final List<Widget> _actualScreens = [
     const HomeScreen(),
-    const BranchScreen(),
+    const ShopScreen(),
     const MyBookingsScreen(),
     const AccountScreen(),
   ];
@@ -279,8 +279,10 @@ class MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     int mapIndexToScreen(int tabIndex) {
-      if (tabIndex < 2) return tabIndex;
-      if (tabIndex > 2) return tabIndex - 1;
+      if (tabIndex < 2) return tabIndex;        // 0,1 → 0,1
+      if (tabIndex == 2) return 0;              // 2 (Đặt lịch) → không map
+      if (tabIndex == 3) return 2;              // 3 → 2 (Bookings)
+      if (tabIndex == 4) return 3;              // 4 → 3 (Account)
       return 0;
     }
     
@@ -301,7 +303,7 @@ class MainScreenState extends State<MainScreen> {
         initialActiveIndex: _selectedIndex,
         items: [
           TabItem(icon: Icons.home_rounded, title: 'Trang chủ'),
-          TabItem(icon: Icons.storefront_rounded, title: 'Chi nhánh'),
+          TabItem(icon: Icons.shopping_bag_rounded, title: 'Cửa hàng'),
           TabItem(icon: Icons.add, title: 'Đặt lịch'),
           TabItem(icon: Icons.history_rounded, title: 'Lịch sử'),
           TabItem(icon: Icons.person_rounded, title: 'Tài khoản'),

@@ -252,16 +252,40 @@ class FirestoreService {
   // Lấy các voucher còn hiệu lực
   Stream<List<Voucher>> getActiveVouchers() {
     final now = DateTime.now();
+    print('=== FIRESTORE QUERY DEBUG ===');
+    print('Querying active vouchers at: $now');
+    
+    // Thử query đơn giản trước
     return _db
         .collection('vouchers')
-        .where('isActive', isEqualTo: true)
-        .where('validTo', isGreaterThan: Timestamp.fromDate(now))
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Voucher.fromFirestore(doc))
-              .where((voucher) => voucher.isValid)
-              .toList();
+          print('Query returned ${snapshot.docs.length} total documents');
+          
+          final allVouchers = snapshot.docs.map((doc) {
+            final data = doc.data();
+            print('Document ${doc.id}:');
+            print('  - isActive: ${data['isActive']}');
+            print('  - validFrom: ${data['validFrom']}');
+            print('  - validTo: ${data['validTo']}');
+            return Voucher.fromFirestore(doc);
+          }).toList();
+          
+          print('Parsed ${allVouchers.length} vouchers');
+          
+          // Filter manually
+          final activeVouchers = allVouchers.where((voucher) {
+            final isValid = voucher.isActive && 
+                           voucher.isValid &&
+                           voucher.validTo.isAfter(now);
+            print('Voucher ${voucher.code}: isActive=${voucher.isActive}, isValid=${voucher.isValid}, validTo=${voucher.validTo} > now=$now = $isValid');
+            return isValid;
+          }).toList();
+          
+          print('Active valid vouchers: ${activeVouchers.length}');
+          print('=============================');
+          
+          return activeVouchers;
         });
   }
 
@@ -326,6 +350,100 @@ class FirestoreService {
       print('Error getting voucher by code: $e');
       return null;
     }
+  }
+
+  // Lưu voucher cho user
+  Future<bool> saveVoucherForUser(String voucherId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedVouchers')
+          .doc(voucherId)
+          .set({
+        'voucherId': voucherId,
+        'savedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      print('Error saving voucher: $e');
+      return false;
+    }
+  }
+
+  // Bỏ lưu voucher
+  Future<bool> unsaveVoucherForUser(String voucherId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedVouchers')
+          .doc(voucherId)
+          .delete();
+
+      return true;
+    } catch (e) {
+      print('Error unsaving voucher: $e');
+      return false;
+    }
+  }
+
+  // Kiểm tra xem voucher đã được lưu chưa
+  Future<bool> isVoucherSaved(String voucherId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      final doc = await _db
+          .collection('users')
+          .doc(user.uid)
+          .collection('savedVouchers')
+          .doc(voucherId)
+          .get();
+
+      return doc.exists;
+    } catch (e) {
+      print('Error checking saved voucher: $e');
+      return false;
+    }
+  }
+
+  // Lấy danh sách voucher đã lưu
+  Stream<List<Voucher>> getSavedVouchers() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('savedVouchers')
+        .orderBy('savedAt', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+      final List<Voucher> vouchers = [];
+      
+      for (var doc in snapshot.docs) {
+        final voucherId = doc.data()['voucherId'];
+        final voucherDoc = await _db.collection('vouchers').doc(voucherId).get();
+        
+        if (voucherDoc.exists) {
+          final voucher = Voucher.fromFirestore(voucherDoc);
+          // Chỉ thêm voucher còn hợp lệ
+          if (voucher.isValid) {
+            vouchers.add(voucher);
+          }
+        }
+      }
+      
+      return vouchers;
+    });
   }
 
   // --- STYLIST METHODS ---

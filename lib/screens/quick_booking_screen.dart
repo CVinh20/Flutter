@@ -11,6 +11,7 @@ import '../models/voucher.dart';
 import '../services/firestore_service.dart';
 import '../models/booking.dart';
 import '../services/notification_service.dart';
+import '../widgets/saved_vouchers_picker.dart';
 import '../main.dart';
 
 class QuickBookingScreen extends StatefulWidget {
@@ -504,12 +505,79 @@ class _QuickBookingScreenState extends State<QuickBookingScreen> {
     );
   }
 
+  Future<void> _showSavedVouchers() async {
+    if (selectedService == null) {
+      EasyLoading.showInfo('Vui lòng chọn dịch vụ trước');
+      return;
+    }
+
+    final Voucher? picked = await showModalBottomSheet<Voucher>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SavedVouchersPicker(
+        firestoreService: _firestoreService,
+        orderValue: selectedService!.price,
+      ),
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _voucherController.text = picked.code;
+      });
+      await _applyVoucher();
+    }
+  }
+
   Widget _buildVoucherSection() {
     final finalAmount = selectedService != null ? selectedService!.price - _discount : 0.0;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Button to show saved vouchers - ALWAYS SHOW
+        if (_appliedVoucher == null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              onTap: _showSavedVouchers,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEC4899), Color(0xFFF472B6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFEC4899).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.bookmark, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Xem voucher đã lưu',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        
         // Voucher input field with apply button
         Row(
           children: [

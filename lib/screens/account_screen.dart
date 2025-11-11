@@ -10,6 +10,7 @@ import 'profile/notifications_screen.dart';
 import 'profile/help_support_screen.dart';
 import 'profile/about_us_screen.dart';
 import 'profile/terms_policy_screen.dart';
+import 'saved_vouchers_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -291,6 +292,14 @@ class AccountScreenState extends State<AccountScreen> with SingleTickerProviderS
                           ),
                           const Divider(height: 1),
                           _buildMenuItem(
+                            title: 'Voucher đã lưu',
+                            subtitle: 'Các ưu đãi đã lưu',
+                            icon: Icons.bookmark,
+                            iconColor: const Color(0xFFEC4899),
+                            onTap: () => _navigateTo(const SavedVouchersScreen()),
+                          ),
+                          const Divider(height: 1),
+                          _buildMenuItem(
                             title: 'Lịch sử giao dịch',
                             subtitle: 'Xem lịch sử đặt lịch',
                             icon: Icons.history,
@@ -422,18 +431,21 @@ class AccountScreenState extends State<AccountScreen> with SingleTickerProviderS
     required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
+    Color? iconColor,
   }) {
+    final displayIconColor = iconColor ?? const Color(0xFF0891B2);
+    
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0891B2).withOpacity(0.1),
+          color: displayIconColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
-          color: const Color(0xFF0891B2),
+          color: displayIconColor,
           size: 20,
         ),
       ),

@@ -10,6 +10,7 @@ import 'manage_stylists_screen.dart';
 import 'manage_bookings_screen.dart';
 import 'manage_categories_screen.dart';
 import 'manage_vouchers_screen.dart';
+import 'manage_employees_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -220,14 +221,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       },
                     ),
                     FutureBuilder<int>(
-                      future: _adminService.getTodayBookingsCount(),
+                      future: _adminService.getEmployeesCount(),
                       builder: (context, snapshot) {
                         return AdminStatsCard(
-                          title: 'Đơn hôm nay',
+                          title: 'Nhân viên',
                           value: snapshot.data?.toString() ?? '...',
-                          icon: Icons.calendar_today_outlined,
-                          color: AdminColors.warning,
-                          subtitle: snapshot.hasError ? 'Lỗi tải dữ liệu' : 'Lịch hẹn hôm nay',
+                          icon: Icons.badge_outlined,
+                          color: const Color(0xFF6B46C1),
+                          subtitle: snapshot.hasError ? 'Lỗi tải dữ liệu' : 'Nhân viên đang hoạt động',
                         );
                       },
                     ),
@@ -296,6 +297,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ),
                     _buildManagementCard(
+                      icon: Icons.badge_outlined,
+                      title: 'Nhân viên',
+                      subtitle: 'Quản lý tài khoản nhân viên',
+                      color: const Color(0xFF6B46C1),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ManageEmployeesScreen(),
+                        ),
+                      ),
+                    ),
+                    _buildManagementCard(
                       icon: Icons.person_outline,
                       title: 'Stylist',
                       subtitle: 'Quản lý stylist',
@@ -311,7 +324,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       icon: Icons.calendar_today_outlined,
                       title: 'Đơn đặt lịch',
                       subtitle: 'Quản lý đơn đặt lịch',
-                      color: const Color(0xFF6B46C1),
+                      color: const Color(0xFFEC4899),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -323,7 +336,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       icon: Icons.local_offer_outlined,
                       title: 'Voucher',
                       subtitle: 'Quản lý voucher',
-                      color: const Color(0xFFEC4899),
+                      color: const Color(0xFF10B981),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(

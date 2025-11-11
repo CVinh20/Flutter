@@ -8,6 +8,7 @@ import '../models/stylist.dart';
 import '../models/branch.dart';
 import '../models/voucher.dart';
 import '../services/firestore_service.dart';
+import '../widgets/saved_vouchers_picker.dart';
 import '../main.dart';
 
 class BookingScreen extends StatefulWidget {
@@ -719,12 +720,74 @@ class BookingScreenState extends State<BookingScreen> with TickerProviderStateMi
     );
   }
 
+  Future<void> _showSavedVouchers(Service service) async {
+    final Voucher? picked = await showModalBottomSheet<Voucher>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SavedVouchersPicker(
+        firestoreService: _firestoreService,
+        orderValue: service.price,
+      ),
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _voucherController.text = picked.code;
+      });
+      await _applyVoucher(service);
+    }
+  }
+
   Widget _buildVoucherSection(Service service) {
     final finalAmount = service.price - _discount;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Button to show saved vouchers
+        if (_appliedVoucher == null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              onTap: () => _showSavedVouchers(service),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEC4899), Color(0xFFF472B6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFEC4899).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.bookmark, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Xem voucher đã lưu',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(

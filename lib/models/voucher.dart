@@ -63,6 +63,16 @@ class Voucher {
 
   factory Voucher.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    
+    // Parse dates with null safety
+    DateTime parseDate(dynamic value, DateTime defaultDate) {
+      if (value == null) return defaultDate;
+      if (value is Timestamp) return value.toDate();
+      return defaultDate;
+    }
+    
+    final now = DateTime.now();
+    
     return Voucher(
       id: doc.id,
       code: data['code'] ?? '',
@@ -71,11 +81,11 @@ class Voucher {
       discount: (data['discount'] ?? 0).toDouble(),
       maxDiscount: data['maxDiscount']?.toDouble(),
       minOrderValue: (data['minOrderValue'] ?? 0).toDouble(),
-      validFrom: (data['validFrom'] as Timestamp).toDate(),
-      validTo: (data['validTo'] as Timestamp).toDate(),
+      validFrom: parseDate(data['validFrom'], now),
+      validTo: parseDate(data['validTo'], now.add(const Duration(days: 30))),
       totalQuantity: data['totalQuantity'] ?? 0,
       usedQuantity: data['usedQuantity'] ?? 0,
-      isActive: data['isActive'] ?? true,
+      isActive: data['isActive'] ?? false,
       imageUrl: data['imageUrl'],
       usedBy: data['usedBy'] != null ? List<String>.from(data['usedBy']) : null,
     );

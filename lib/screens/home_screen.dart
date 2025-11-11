@@ -6,6 +6,10 @@ import '../models/category.dart';
 import '../services/firestore_service.dart';
 import '../widgets/voucher_section.dart';
 import 'booking_screen.dart';
+import 'saved_vouchers_screen.dart';
+import 'branch_screen.dart';
+import 'shop_screen.dart';
+import 'profile/favorite_services_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -108,22 +112,60 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _TopButton(
-                            icon: Icons.card_giftcard_rounded, 
-                            label: 'Ưu đãi', 
+                            icon: Icons.store_rounded, 
+                            label: 'Cửa hàng', 
                             color: const Color(0xFFFFF7ED),
                             iconColor: const Color(0xFFEA580C),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ShopScreen(),
+                                ),
+                              );
+                            },
                           ),
                           _TopButton(
-                            icon: Icons.verified_user_rounded, 
-                            label: 'Cam kết KTV', 
+                            icon: Icons.bookmark,
+                            label: 'Voucher',
+                            color: const Color(0xFFFCE7F3),
+                            iconColor: const Color(0xFFEC4899),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SavedVouchersScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          _TopButton(
+                            icon: Icons.favorite_rounded, 
+                            label: 'Yêu thích', 
                             color: const Color(0xFFF0FDF4),
                             iconColor: const Color(0xFF16A34A),
+                           onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const FavoriteServicesScreen(),
+                                ),
+                              );
+                            },
                           ),
                           _TopButton(
                             icon: Icons.public_rounded, 
                             label: 'Chi nhánh', 
                             color: const Color(0xFFEFF6FF),
                             iconColor: const Color(0xFF2563EB),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const BranchScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -637,50 +679,55 @@ class _TopButton extends StatelessWidget {
   final String label;
   final Color color;
   final Color iconColor;
+  final VoidCallback? onTap;
+  
   const _TopButton({
     required this.icon, 
     required this.label, 
     required this.color,
     required this.iconColor,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              ),
-            ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.3)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 32,
+            ),
           ),
-          child: Icon(
-            icon,
-            color: iconColor,
-            size: 32,
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF374151),
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF374151),
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+        ],
+      ),
     );
   }
-
 }

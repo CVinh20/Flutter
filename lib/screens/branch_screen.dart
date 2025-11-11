@@ -67,6 +67,10 @@ class _BranchScreenState extends State<BranchScreen> {
             pinned: true,
             backgroundColor: const Color(0xFF0891B2),
             elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(

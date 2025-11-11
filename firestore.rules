@@ -2,6 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ==================== HELPER FUNCTIONS ====================
+    
     // Kiểm tra xem user đã đăng nhập chưa
     function isAuthenticated() {
       return request.auth != null;
@@ -19,6 +21,13 @@ service cloud.firestore {
       return isAuthenticated() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.stylistId != null;
+    }
+    
+    // Kiểm tra xem user có phải là employee không
+    function isEmployee() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/employees/{document=**}) &&
+        get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.userId == request.auth.uid;
     }
     
     // Kiểm tra xem user có phải là stylist của booking này không
@@ -43,12 +52,40 @@ service cloud.firestore {
       return isAuthenticated() && paymentData.userId == request.auth.uid;
     }
     
+    // ==================== COLLECTION RULES ====================
+    
     // Rules cho collection users
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isAdmin()  // Admin có thể tạo user mới (cho nhân viên)
+      );
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isAdmin()
+      );
       allow delete: if isAdmin();
+      
+      // Rules cho subcollection savedVouchers
+      match /savedVouchers/{voucherId} {
+        // User chỉ có thể đọc/ghi voucher đã lưu của chính mình
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow create: if isAuthenticated() && request.auth.uid == userId;
+        allow update: if isAuthenticated() && request.auth.uid == userId;
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Rules cho collection employees (MỚI)
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();  // Tất cả user đã đăng nhập có thể đọc
+      allow create: if isAdmin();  // Chỉ admin mới tạo được employee
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.userId == request.auth.uid  // Employee có thể update thông tin của mình
+      );
+      allow delete: if isAdmin();  // Chỉ admin mới xóa được
     }
     
     // Rules cho collection bookings
@@ -61,7 +98,8 @@ service cloud.firestore {
         isStylistOfBooking()
       );
       allow delete: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
       );
     }
     
@@ -98,11 +136,14 @@ service cloud.firestore {
     // Rules cho collection payments
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
       );
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
       );
       allow delete: if isAdmin();
     }
@@ -110,11 +151,14 @@ service cloud.firestore {
     // Rules cho collection transactions
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
       );
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
       );
       allow delete: if isAdmin();
     }
@@ -123,6 +167,12 @@ service cloud.firestore {
     match /paymentMethods/{methodId} {
       allow read: if true;  // Cho phép đọc công khai
       allow write: if isAdmin();
+    }
+    
+    // ==================== FALLBACK RULE ====================
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
