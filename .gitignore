@@ -1,5 +1,14 @@
 # Dependencies
 node_modules/
+# Flutter / Dart
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+*.lock
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
