@@ -1,0 +1,60 @@
+name: nguyenanhkhoi1
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.2.3
+  # Firebase - Keeping for legacy code compatibility
+  firebase_core: ^3.2.0
+  firebase_auth: ^5.1.2
+  google_sign_in: ^6.2.1
+  cloud_firestore: ^5.0.2
+  firebase_storage: ^12.1.0
+  image_picker: ^1.1.2
+  intl: ^0.18.1
+  flutter_local_notifications: ^17.1.2 
+  timezone: ^0.9.3
+  shimmer: ^3.0.0
+  flutter_easyloading: ^3.0.5
+  convex_bottom_bar: ^3.2.0
+  flutter_osm_plugin: ^1.4.2
+  geolocator: ^14.0.1
+  url_launcher: ^6.3.2
+  http: ^1.5.0
+  qr_flutter: ^4.1.0
+  vietqr_core: ^0.2.5+1
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.0 
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
+flutter_native_splash:
+  color: "#FFFFFF" # Màu trắng
+  image: assets/images/splash_logo_with_slogan.png
+  android: true
+  ios: true
+  web: false 
+
+flutter_launcher_icons:
+  image_path: assets/images/gg.png
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/images/gg.png
